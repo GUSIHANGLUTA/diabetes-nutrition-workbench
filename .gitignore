@@ -1,0 +1,18 @@
+# 第三方参考数据：体积较大，且需遵守上游仓库与《中国食物成分表》的授权
+# 需要时用 tools/fetch_reference_data.py 重新拉取（不影响程序运行）
+refs/*
+!refs/NOTES.md
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# 临时产物
+*.log
+_dom*.html
+*.tmp
+~$*
