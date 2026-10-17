@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>糖尿病配餐与血糖管理工作台（本地版）</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="jsErr" class="note danger" style="display:none;margin:12px 18px"></div>
+<div id="selftest" class="card" style="display:none;margin:12px 18px"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">糖</span>
+    <div>
+      <h1>糖尿病配餐与血糖管理工作台</h1>
+      <p class="sub">本地运行 · 无需联网 · 数据只保存在本机浏览器</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <label class="inline">患者编号
+      <input id="ptId" type="text" placeholder="如 A001" style="width:90px">
+    </label>
+    <button id="btnSave" class="btn">保存到本机</button>
+    <button id="btnLoad" class="btn ghost">读取</button>
+    <button id="btnDemo" class="btn ghost">载入示例</button>
+    <button id="btnPrint" class="btn ghost">打印 / 导出 PDF</button>
+    <button id="btnExport" class="btn ghost">导出数据</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="tab-profile">① 基础数据与能量处方</button>
+  <button class="tab" data-tab="tab-plan">② 配餐模板（交换份）</button>
+  <button class="tab" data-tab="tab-swap">③ 食材平替</button>
+  <button class="tab" data-tab="tab-glucose">④ 血糖 · 运动联动</button>
+  <button class="tab" data-tab="tab-data">⑤ 数据与设置</button>
+</nav>
+
+<main>
+<!-- ============ ① 基础数据 ============ -->
+<section id="tab-profile" class="tabpane active">
+  <div class="grid2">
+    <div class="card">
+      <h2>基本信息</h2>
+      <div class="form-grid">
+        <label>姓名 <input id="pName" type="text" placeholder="陈某"></label>
+        <label>性别 <select id="pSex"><option value="male">男</option><option value="female">女</option></select></label>
+        <label>年龄（岁） <input id="pAge" type="number" value="55" min="1" max="120"></label>
+        <label>身高（cm） <input id="pHeight" type="number" value="170" min="100" max="220"></label>
+        <label>体重（kg） <input id="pWeight" type="number" value="75" min="20" max="250" step="0.1"></label>
+        <label>活动强度
+          <select id="pActivity">
+            <option value="bed">卧床 / 极少活动</option>
+            <option value="light" selected>轻体力（办公、家务、散步）</option>
+            <option value="moderate">中体力（销售、护理、规律运动）</option>
+            <option value="heavy">重体力（搬运、农活、高强度训练）</option>
+          </select>
+        </label>
+        <label>糖尿病类型
+          <select id="pType">
+            <option value="t2">2 型</option>
+            <option value="t1">1 型</option>
+            <option value="gest">妊娠期糖尿病</option>
+            <option value="pre">糖尿病前期</option>
+          </select>
+        </label>
+        <label>治疗方式
+          <select id="pTreat">
+            <option value="lifestyle">生活方式干预（无药）</option>
+            <option value="oral_low">口服药（低低血糖风险：二甲双胍/DPP-4i/SGLT2i/GLP-1RA）</option>
+            <option value="oral_high">口服药（含促泌剂：磺脲类/格列奈类）</option>
+            <option value="basal">基础胰岛素</option>
+            <option value="mdi">基础+餐时胰岛素（多次注射）</option>
+            <option value="premix">预混胰岛素</option>
+            <option value="pump">胰岛素泵</option>
+          </select>
+        </label>
+        <label>妊娠阶段
+          <select id="pGest">
+            <option value="no">不适用</option>
+            <option value="t1tri">孕早期（1–12 周）</option>
+            <option value="t2tri">孕中期（13–27 周）</option>
+            <option value="t3tri">孕晚期（≥28 周）</option>
+            <option value="lact">哺乳期</option>
+          </select>
+        </label>
+        <label>肾功能（eGFR / CKD 分期）
+          <select id="pCkd">
+            <option value="normal">正常或未查</option>
+            <option value="ckd3">CKD 3 期（eGFR 30–59）</option>
+            <option value="ckd45">CKD 4–5 期 / 透析</option>
+          </select>
+        </label>
+        <label>合并症（可多选）
+          <div class="checks">
+            <label class="chk"><input type="checkbox" id="pComorbHtn" checked> 高血压</label>
+            <label class="chk"><input type="checkbox" id="pComorbLip"> 血脂异常</label>
+            <label class="chk"><input type="checkbox" id="pComorbGout"> 高尿酸/痛风</label>
+            <label class="chk"><input type="checkbox" id="pComorbGp"> 胃轻瘫/消化不良</label>
+          </div>
+        </label>
+        <label>营养目标
+          <select id="pGoal">
+            <option value="maintain" selected>维持体重、平稳血糖</option>
+            <option value="lose">减重（-300～500 kcal）</option>
+            <option value="gain">增重/纠正营养不良</option>
+            <option value="muscle">老年防肌少症（保蛋白）</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">提示：能量系数按《中国糖尿病医学营养治疗指南》理想体重法计算，可手动覆盖下方结果。</p>
+    </div>
+
+    <div class="card">
+      <h2>计算结果 <span class="badge" id="calcBadge"></span></h2>
+      <div id="profileOut" class="kv"></div>
+      <h3>营养素目标（可手动微调）</h3>
+      <div class="form-grid">
+        <label>每日能量 kcal <input id="mEnergy" type="number" step="10"></label>
+        <label>碳水占比 % <input id="mChoPct" type="number" step="1" min="40" max="60"></label>
+        <label>蛋白 g/kg 理想体重 <input id="mProPerKg" type="number" step="0.1" min="0.6" max="2"></label>
+        <label>脂肪占比 % <input id="mFatPct" type="number" step="1" min="15" max="40"></label>
+        <label>膳食纤维目标 g <input id="mFiber" type="number" step="1"></label>
+      </div>
+      <table class="tbl compact" id="macroTbl"></table>
+      <div class="row">
+        <button id="btnApplyMacro" class="btn">按基础数据重算并生成配餐</button>
+      </div>
+      <p class="hint" id="macroWarn"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ② 配餐模板 ============ -->
+<section id="tab-plan" class="tabpane">
+  <div class="card">
+    <h2>餐次分配</h2>
+    <div class="row wrap">
+      <label class="inline">分配方案
+        <select id="mealPreset">
+          <option value="three">标准三餐（1/5 · 2/5 · 2/5）</option>
+          <option value="three_snack" selected>三餐 + 2 次加餐（20 / 5 / 30 / 5 / 30 / 10）</option>
+          <option value="six">少食多餐 6 餐（18 / 7 / 25 / 8 / 27 / 15）</option>
+          <option value="gastroparesis">胃轻瘫/餐后高血糖（15 / 10 / 20 / 10 / 20 / 10 / 15）</option>
+          <option value="custom">自定义</option>
+        </select>
+      </label>
+      <label class="inline">主食（谷薯）分配策略
+        <select id="carbStrategy">
+          <option value="even" selected>三餐均分，加餐以蛋白/水果为主</option>
+          <option value="front">早餐略多（防上午低血糖）</option>
+          <option value="back">晚餐略少（防空腹高血糖）</option>
+        </select>
+      </label>
+      <label class="inline">模板口味
+        <select id="flavorPref">
+          <option value="cn" selected>中式家常（默认）</option>
+          <option value="simple">简易快手（少油少盐、10 分钟）</option>
+          <option value="veg">素食为主</option>
+          <option value="lowgi">低 GI 强化</option>
+        </select>
+      </label>
+      <button id="btnGenPlan" class="btn">重新生成配餐模板</button>
+    </div>
+    <div id="mealPctBox" class="pct-box"></div>
+  </div>
+
+  <div class="card">
+    <h2>一日配餐模板（交换份法）</h2>
+    <div id="planWrap"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>全天营养合计 vs 目标</h2>
+      <div id="dayNutri"></div>
+    </div>
+    <div class="card">
+      <h2>血糖负荷（GL）与 GI 分布</h2>
+      <div id="glycemicBox"></div>
+      <p class="hint">GL = GI × 可利用碳水(g) / 100。全天 GL ≤ 80 较理想；单餐 GL ≤ 25 有利于餐后血糖平稳。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>配餐基本要求自检</h2>
+    <table class="tbl" id="checkTbl"></table>
+  </div>
+</section>
+
+<!-- ============ ③ 平替 ============ -->
+<section id="tab-swap" class="tabpane">
+  <div class="grid2">
+    <div class="card">
+      <h2>食材平替</h2>
+      <div class="form-grid">
+        <label>要替换的食材
+          <select id="swapFrom"></select>
+        </label>
+        <label>替换方式
+          <select id="swapMode">
+            <option value="carb">按碳水等价（推荐，餐后血糖最稳）</option>
+            <option value="energy">按能量等价</option>
+            <option value="protein">按蛋白质等价</option>
+          </select>
+        </label>
+        <label>筛选条件
+          <div class="checks">
+            <label class="chk"><input type="checkbox" id="swapLowGI" checked> 仅显示 GI 不高于原食材</label>
+            <label class="chk"><input type="checkbox" id="swapSameCat" checked> 仅同类食物交换份</label>
+          </div>
+        </label>
+      </div>
+      <div id="swapCandidates"></div>
+    </div>
+    <div class="card">
+      <h2>替换对比</h2>
+      <div id="swapCompare" class="hint">从左侧选择候选食材，即可看到等量替换后的营养素与 GL 变化。</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>食物成分与 GI 查询</h2>
+    <div class="row wrap">
+      <label class="inline">搜索 <input id="foodSearch" type="text" placeholder="如：米饭 / 燕麦 / 苹果"></label>
+      <label class="inline">分类 <select id="foodCatFilter"></select></label>
+      <label class="inline">排序
+        <select id="foodSort">
+          <option value="name">按名称</option>
+          <option value="gi">按 GI 升序</option>
+          <option value="gl">按 GL 升序</option>
+          <option value="kcal">按能量升序</option>
+        </select>
+      </label>
+    </div>
+    <div class="scroll-y"><table class="tbl" id="foodTbl"></table></div>
+  </div>
+</section>
+
+<!-- ============ ④ 血糖 · 运动 ============ -->
+<section id="tab-glucose" class="tabpane">
+  <div class="grid2">
+    <div class="card">
+      <h2>实时血糖录入</h2>
+      <div class="form-grid">
+        <label>测量时间 <input id="gTime" type="datetime-local"></label>
+        <label>当前血糖 mmol/L <input id="gValue" type="number" step="0.1" placeholder="如 8.6"></label>
+        <label>血糖仪趋势 / CGM 箭头
+          <select id="gTrend">
+            <option value="flat">→ 平稳（±0.5 mmol/L/15min）</option>
+            <option value="up1">↗ 缓升</option>
+            <option value="up2">↑ 上升</option>
+            <option value="up3">↑↑ 快速上升（&gt;2.2/15min）</option>
+            <option value="down1">↘ 缓降</option>
+            <option value="down2">↓ 下降</option>
+            <option value="down3">↓↓ 快速下降</option>
+          </select>
+        </label>
+        <label>测量时段
+          <select id="gPhase">
+            <option value="premeal">餐前</option>
+            <option value="post1">餐后 1 小时</option>
+            <option value="post2" selected>餐后 2 小时</option>
+            <option value="fasting">空腹 / 清晨</option>
+            <option value="bed">睡前</option>
+            <option value="night">夜间 0–3 点</option>
+            <option value="exercise_pre">运动前</option>
+            <option value="exercise_post">运动后</option>
+          </select>
+        </label>
+        <label>距上一餐（分钟） <input id="gSinceMeal" type="number" step="5" placeholder="如 180"></label>
+        <label>是否出现低血糖症状
+          <select id="gSymptoms"><option value="no">无</option><option value="yes">心慌、出汗、手抖、饥饿、头晕</option><option value="severe">意识模糊 / 需他人帮助</option></select>
+        </label>
+        <label>下一步计划
+          <select id="gNext">
+            <option value="meal" selected>即将进餐</option>
+            <option value="exercise">即将运动</option>
+            <option value="sleep">准备睡觉</option>
+            <option value="none">暂不安排</option>
+          </select>
+        </label>
+        <label>计划运动强度
+          <select id="gExIntensity">
+            <option value="low">低强度（散步、家务）</option>
+            <option value="mod" selected>中等强度（快走、骑车、太极、游泳）</option>
+            <option value="high">较大强度（跑步、跳绳、球类、抗阻）</option>
+            <option value="hiit">高强度间歇 / 大重量抗阻</option>
+          </select>
+        </label>
+        <label>计划运动时长（分钟） <input id="gExMin" type="number" value="30" step="5"></label>
+        <label>酮体情况
+          <select id="gKetone">
+            <option value="unknown">未测</option>
+            <option value="neg">阴性</option>
+            <option value="pos">阳性 / 尿酮 + 以上</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <button id="btnGlucose" class="btn">计算进餐与运动方案</button>
+        <button id="btnGlucoseDemo" class="btn ghost">载入示例读数</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>即时建议 <span class="badge" id="gLevelBadge"></span></h2>
+      <div id="gOut" class="hint">录入血糖后点击「计算进餐与运动方案」。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>时间轴（进餐 · 加餐 · 运动 · 监测）</h2>
+    <div id="timeline"></div>
+  </div>
+
+  <div class="card">
+    <h2>调整后的当日配餐（随血糖自动改量改种类）</h2>
+    <div id="adjustedPlan"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>连续血糖数据（CGM / 血糖仪记录）</h2>
+      <p class="hint">支持两种录入：① 直接粘贴「时间,血糖」两列（逗号/制表符/空格分隔，可含表头）；② 选择 CGM 导出的 CSV 文件（雅培瞬感、硅基、三诺等导出格式均可尝试，程序会自动识别时间与血糖列）。</p>
+      <textarea id="cgmText" rows="6" placeholder="2025-01-01 07:30, 7.2&#10;2025-01-01 08:00, 8.9&#10;..."></textarea>
+      <div class="row wrap">
+        <input type="file" id="cgmFile" accept=".csv,.txt">
+        <button id="btnCgm" class="btn">分析连续血糖</button>
+        <button id="btnCgmDemo" class="btn ghost">载入示例 CGM</button>
+      </div>
+      <div id="cgmOut"></div>
+    </div>
+    <div class="card">
+      <h2>血糖曲线</h2>
+      <canvas id="cgmChart" width="640" height="240"></canvas>
+      <div class="hint">绿色区间 3.9–10.0 mmol/L（TIR）；红色虚线为低血糖 3.9、高血糖 10.0 与 13.9。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ⑤ 数据 ============ -->
+<section id="tab-data" class="tabpane">
+  <div class="grid2">
+    <div class="card">
+      <h2>食物库</h2>
+      <p class="hint">食物库为本地数据，可导出为 JSON 用 Excel 修改后再导入，以适配你所在机构的《中国食物成分表》版本与常用食材。</p>
+      <div class="row wrap">
+        <button id="btnFoodExport" class="btn">导出食物库 JSON</button>
+        <input type="file" id="foodImport" accept=".json">
+        <button id="btnFoodReset" class="btn ghost">恢复默认食物库</button>
+      </div>
+      <table class="tbl compact" id="foodStatTbl"></table>
+    </div>
+    <div class="card">
+      <h2>本机存档</h2>
+      <div id="storeList"></div>
+      <div class="row wrap">
+        <button id="btnStoreRefresh" class="btn ghost">刷新列表</button>
+      </div>
+      <h3>导入 / 导出患者数据</h3>
+      <textarea id="dataJson" rows="6" placeholder="导出的 JSON 会显示在这里，也可粘贴 JSON 后点击「导入数据」"></textarea>
+      <div class="row"><button id="btnImport" class="btn">导入数据</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>规则阈值（可自行调整，默认值为指南常用值）</h2>
+    <table class="tbl" id="ruleTbl"></table>
+  </div>
+  <div class="card">
+    <h2>免责声明与数据来源</h2>
+    <p class="hint">
+      本工具用于营养师日常配餐计算与患者教育，属于辅助计算工具，不构成诊疗意见，不能替代医师处方与营养师面诊。
+      血糖异常（尤其 &lt;3.0 或 &gt;13.9 mmol/L、酮体阳性、意识改变）请立即按机构流程处理并联系医生。
+      食物成分数据参考《中国食物成分表》与公开发表的 GI 数据，请结合本机构版本核对后使用。
+    </p>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <span>本地单机运行 · 无网络请求 · 数据保存在浏览器 localStorage</span>
+  <span id="verTag"></span>
+</footer>
+
+<script src="data-foods.js"></script>
+<script src="engine-prescription.js"></script>
+<script src="engine-glucose.js"></script>
+<script>
+  window.__errs = [];
+  window.addEventListener('error', function (e) {
+    window.__errs.push(String(e.message));
+    var b = document.getElementById('jsErr');
+    if (b) { b.style.display = 'block'; b.textContent = '脚本错误：' + e.message + '（' + (e.filename || '') + ' 第 ' + (e.lineno || '') + ' 行）'; }
+  });
+</script>
+<script src="app.js"></script>
+</body>
+</html>

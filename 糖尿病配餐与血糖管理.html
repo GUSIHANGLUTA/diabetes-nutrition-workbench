@@ -1,0 +1,3390 @@
+<!--
+  糖尿病配餐与血糖管理工作台（单文件版）
+  由 tools/build_single.py 自动生成，请勿直接修改本文件；
+  如需修改请编辑 app/ 目录下的源文件后重新打包。
+  数据来源：《中国食物成分表（标准版 第6版）》整理数据 + 食物血糖生成指数（GI）附表。
+  本工具为营养师配餐与患者教育辅助工具，不构成诊疗意见。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>糖尿病配餐与血糖管理工作台（本地版）</title>
+<style>
+/* ================================================================
+   糖尿病配餐与血糖管理工作台 —— 样式
+   纯 CSS，无外部依赖，适配打印（A4）
+   ================================================================ */
+:root {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --ink: #1f2937;
+  --ink-2: #4b5563;
+  --ink-3: #6b7280;
+  --line: #e3e8ef;
+  --brand: #0f766e;
+  --brand-2: #14b8a6;
+  --brand-soft: #e6f5f3;
+  --ok: #15803d;
+  --ok-soft: #e8f7ee;
+  --warn: #b45309;
+  --warn-soft: #fdf3e3;
+  --danger: #b91c1c;
+  --danger-soft: #fdecec;
+  --info: #1d4ed8;
+  --info-soft: #eaeffd;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.6 "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* ---------------- 顶栏 ---------------- */
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 12px 18px; background: linear-gradient(100deg, #0f766e, #14b8a6 70%, #22d3ee);
+  color: #fff; box-shadow: var(--shadow);
+}
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .2); font-weight: 700; font-size: 18px;
+}
+.topbar h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .3px; }
+.topbar .sub { margin: 2px 0 0; font-size: 12px; opacity: .85; }
+.topbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ---------------- 选项卡 ---------------- */
+.tabs {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 18px 0; background: var(--panel);
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20;
+}
+.tab {
+  border: 1px solid transparent; border-bottom: none; background: transparent; cursor: pointer;
+  padding: 8px 14px; border-radius: 8px 8px 0 0; font: inherit; color: var(--ink-2);
+}
+.tab:hover { background: var(--brand-soft); color: var(--brand); }
+.tab.active { background: var(--brand-soft); color: var(--brand); font-weight: 700; border-color: var(--line); }
+
+main { padding: 16px 18px 40px; max-width: 1500px; margin: 0 auto; }
+.tabpane { display: none; }
+.tabpane.active { display: block; }
+
+/* ---------------- 卡片 ---------------- */
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow);
+}
+.card h2 { margin: 0 0 10px; font-size: 15px; color: var(--brand); display: flex; align-items: center; gap: 8px; }
+.card h3 { margin: 14px 0 8px; font-size: 13.5px; color: var(--ink-2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; align-items: start; }
+.row { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+.row.wrap { flex-wrap: wrap; }
+.hint { color: var(--ink-3); font-size: 12.5px; line-height: 1.7; }
+
+/* ---------------- 表单 ---------------- */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 14px; }
+label { font-size: 12.5px; color: var(--ink-2); display: block; }
+label.inline { display: inline-flex; align-items: center; gap: 6px; }
+input[type="text"], input[type="number"], input[type="datetime-local"], select, textarea {
+  width: 100%; padding: 6px 8px; margin-top: 3px; border: 1px solid var(--line);
+  border-radius: 7px; font: inherit; color: var(--ink); background: #fff;
+}
+label.inline input, label.inline select { width: auto; margin-top: 0; }
+textarea { font-family: Consolas, "Courier New", monospace; font-size: 12.5px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-2); outline-offset: 0; border-color: var(--brand-2); }
+.checks { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.chk { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; }
+.chk input { width: auto; margin: 0; }
+
+/* ---------------- 按钮 ---------------- */
+.btn {
+  border: 1px solid var(--brand); background: var(--brand); color: #fff; padding: 7px 14px;
+  border-radius: 8px; cursor: pointer; font: inherit; box-shadow: var(--shadow);
+}
+.btn:hover { background: #0d635c; }
+.btn.ghost { background: #fff; color: var(--brand); }
+.btn.ghost:hover { background: var(--brand-soft); }
+.btn.mini { padding: 3px 8px; font-size: 12px; border-radius: 6px; }
+.btn.link { border: none; background: none; color: var(--info); padding: 0 4px; box-shadow: none; text-decoration: underline; }
+
+/* ---------------- 表格 ---------------- */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th, .tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.tbl th { background: #f8fafc; color: var(--ink-2); font-weight: 600; font-size: 12.5px; position: sticky; top: 0; }
+.tbl tbody tr:hover { background: #fafcfe; }
+.tbl.compact th, .tbl.compact td { padding: 4px 6px; font-size: 12.5px; }
+.tbl td.num, .tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl tr.sub td { background: #f8fafc; font-weight: 600; }
+.tbl tr.total td { background: var(--brand-soft); font-weight: 700; }
+.scroll-y { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.scroll-x { overflow-x: auto; }
+
+/* ---------------- 徽标 / 提示 ---------------- */
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 11.5px; font-weight: 600;
+  background: var(--brand-soft); color: var(--brand);
+}
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.danger { background: var(--danger-soft); color: var(--danger); }
+.badge.info { background: var(--info-soft); color: var(--info); }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 14px; }
+.kv .item { background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.kv .item b { display: block; font-size: 17px; color: var(--brand); font-variant-numeric: tabular-nums; }
+.kv .item span { font-size: 12px; color: var(--ink-3); }
+
+.note { border-left: 3px solid var(--brand-2); background: #f7fdfc; padding: 8px 10px; border-radius: 6px; margin: 8px 0; font-size: 12.5px; }
+.note.warn { border-color: #f59e0b; background: var(--warn-soft); }
+.note.danger { border-color: #ef4444; background: var(--danger-soft); }
+.note.ok { border-color: #22c55e; background: var(--ok-soft); }
+.note ul { margin: 4px 0 0 18px; padding: 0; }
+.note li { margin: 2px 0; }
+
+/* ---------------- 进度条 ---------------- */
+.bar { height: 9px; border-radius: 6px; background: #eef2f7; overflow: hidden; margin-top: 4px; }
+.bar > i { display: block; height: 100%; background: var(--brand-2); }
+.bar > i.over { background: #f59e0b; }
+.bar > i.low { background: #60a5fa; }
+.nutri-line { margin-bottom: 9px; }
+.nutri-line .lab { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); }
+
+/* ---------------- 时间轴 ---------------- */
+.timeline { position: relative; padding-left: 8px; }
+.tl-row { display: grid; grid-template-columns: 62px 96px 1fr; gap: 8px; align-items: start; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+.tl-time { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink-2); }
+.tl-kind { font-size: 11.5px; }
+.tl-kind.meal { color: var(--brand); }
+.tl-kind.snack { color: #0e7490; }
+.tl-kind.exercise { color: #7c3aed; }
+.tl-kind.monitor { color: var(--info); }
+.tl-kind.carb { color: var(--danger); font-weight: 700; }
+.tl-detail { font-size: 12px; color: var(--ink-3); }
+
+/* ---------------- 换餐 / 候选列表 ---------------- */
+.cand-list { display: grid; gap: 6px; max-height: 380px; overflow: auto; margin-top: 10px; }
+.cand {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: #fff; cursor: pointer;
+}
+.cand:hover { border-color: var(--brand-2); background: var(--brand-soft); }
+.cand .g { font-size: 12px; color: var(--ink-3); }
+.cand .d { font-size: 12px; color: var(--ink-2); }
+
+/* ---------------- 图表 ---------------- */
+canvas { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+
+/* ---------------- 页脚 ---------------- */
+.foot {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  padding: 12px 18px; color: var(--ink-3); font-size: 12px; border-top: 1px solid var(--line); background: var(--panel);
+}
+
+/* ---------------- 打印 ---------------- */
+@media print {
+  :root { --shadow: none; }
+  body { background: #fff; font-size: 11.5px; }
+  .topbar, .tabs, .foot, .no-print, .btn { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .tabpane { display: block !important; page-break-after: always; }
+  .tabpane:last-child { page-break-after: auto; }
+  .card { border: 1px solid #ccc; box-shadow: none; margin-bottom: 8px; padding: 8px 10px; page-break-inside: avoid; }
+  .grid2 { grid-template-columns: 1fr; }
+  .scroll-y { max-height: none; }
+  a { color: inherit; text-decoration: none; }
+}
+
+</style>
+</head>
+<body>
+<div id="jsErr" class="note danger" style="display:none;margin:12px 18px"></div>
+<div id="selftest" class="card" style="display:none;margin:12px 18px"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">糖</span>
+    <div>
+      <h1>糖尿病配餐与血糖管理工作台</h1>
+      <p class="sub">本地运行 · 无需联网 · 数据只保存在本机浏览器</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <label class="inline">患者编号
+      <input id="ptId" type="text" placeholder="如 A001" style="width:90px">
+    </label>
+    <button id="btnSave" class="btn">保存到本机</button>
+    <button id="btnLoad" class="btn ghost">读取</button>
+    <button id="btnDemo" class="btn ghost">载入示例</button>
+    <button id="btnPrint" class="btn ghost">打印 / 导出 PDF</button>
+    <button id="btnExport" class="btn ghost">导出数据</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab active" data-tab="tab-profile">① 基础数据与能量处方</button>
+  <button class="tab" data-tab="tab-plan">② 配餐模板（交换份）</button>
+  <button class="tab" data-tab="tab-swap">③ 食材平替</button>
+  <button class="tab" data-tab="tab-glucose">④ 血糖 · 运动联动</button>
+  <button class="tab" data-tab="tab-data">⑤ 数据与设置</button>
+</nav>
+
+<main>
+<!-- ============ ① 基础数据 ============ -->
+<section id="tab-profile" class="tabpane active">
+  <div class="grid2">
+    <div class="card">
+      <h2>基本信息</h2>
+      <div class="form-grid">
+        <label>姓名 <input id="pName" type="text" placeholder="陈某"></label>
+        <label>性别 <select id="pSex"><option value="male">男</option><option value="female">女</option></select></label>
+        <label>年龄（岁） <input id="pAge" type="number" value="55" min="1" max="120"></label>
+        <label>身高（cm） <input id="pHeight" type="number" value="170" min="100" max="220"></label>
+        <label>体重（kg） <input id="pWeight" type="number" value="75" min="20" max="250" step="0.1"></label>
+        <label>活动强度
+          <select id="pActivity">
+            <option value="bed">卧床 / 极少活动</option>
+            <option value="light" selected>轻体力（办公、家务、散步）</option>
+            <option value="moderate">中体力（销售、护理、规律运动）</option>
+            <option value="heavy">重体力（搬运、农活、高强度训练）</option>
+          </select>
+        </label>
+        <label>糖尿病类型
+          <select id="pType">
+            <option value="t2">2 型</option>
+            <option value="t1">1 型</option>
+            <option value="gest">妊娠期糖尿病</option>
+            <option value="pre">糖尿病前期</option>
+          </select>
+        </label>
+        <label>治疗方式
+          <select id="pTreat">
+            <option value="lifestyle">生活方式干预（无药）</option>
+            <option value="oral_low">口服药（低低血糖风险：二甲双胍/DPP-4i/SGLT2i/GLP-1RA）</option>
+            <option value="oral_high">口服药（含促泌剂：磺脲类/格列奈类）</option>
+            <option value="basal">基础胰岛素</option>
+            <option value="mdi">基础+餐时胰岛素（多次注射）</option>
+            <option value="premix">预混胰岛素</option>
+            <option value="pump">胰岛素泵</option>
+          </select>
+        </label>
+        <label>妊娠阶段
+          <select id="pGest">
+            <option value="no">不适用</option>
+            <option value="t1tri">孕早期（1–12 周）</option>
+            <option value="t2tri">孕中期（13–27 周）</option>
+            <option value="t3tri">孕晚期（≥28 周）</option>
+            <option value="lact">哺乳期</option>
+          </select>
+        </label>
+        <label>肾功能（eGFR / CKD 分期）
+          <select id="pCkd">
+            <option value="normal">正常或未查</option>
+            <option value="ckd3">CKD 3 期（eGFR 30–59）</option>
+            <option value="ckd45">CKD 4–5 期 / 透析</option>
+          </select>
+        </label>
+        <label>合并症（可多选）
+          <div class="checks">
+            <label class="chk"><input type="checkbox" id="pComorbHtn" checked> 高血压</label>
+            <label class="chk"><input type="checkbox" id="pComorbLip"> 血脂异常</label>
+            <label class="chk"><input type="checkbox" id="pComorbGout"> 高尿酸/痛风</label>
+            <label class="chk"><input type="checkbox" id="pComorbGp"> 胃轻瘫/消化不良</label>
+          </div>
+        </label>
+        <label>营养目标
+          <select id="pGoal">
+            <option value="maintain" selected>维持体重、平稳血糖</option>
+            <option value="lose">减重（-300～500 kcal）</option>
+            <option value="gain">增重/纠正营养不良</option>
+            <option value="muscle">老年防肌少症（保蛋白）</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint">提示：能量系数按《中国糖尿病医学营养治疗指南》理想体重法计算，可手动覆盖下方结果。</p>
+    </div>
+
+    <div class="card">
+      <h2>计算结果 <span class="badge" id="calcBadge"></span></h2>
+      <div id="profileOut" class="kv"></div>
+      <h3>营养素目标（可手动微调）</h3>
+      <div class="form-grid">
+        <label>每日能量 kcal <input id="mEnergy" type="number" step="10"></label>
+        <label>碳水占比 % <input id="mChoPct" type="number" step="1" min="40" max="60"></label>
+        <label>蛋白 g/kg 理想体重 <input id="mProPerKg" type="number" step="0.1" min="0.6" max="2"></label>
+        <label>脂肪占比 % <input id="mFatPct" type="number" step="1" min="15" max="40"></label>
+        <label>膳食纤维目标 g <input id="mFiber" type="number" step="1"></label>
+      </div>
+      <table class="tbl compact" id="macroTbl"></table>
+      <div class="row">
+        <button id="btnApplyMacro" class="btn">按基础数据重算并生成配餐</button>
+      </div>
+      <p class="hint" id="macroWarn"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ② 配餐模板 ============ -->
+<section id="tab-plan" class="tabpane">
+  <div class="card">
+    <h2>餐次分配</h2>
+    <div class="row wrap">
+      <label class="inline">分配方案
+        <select id="mealPreset">
+          <option value="three">标准三餐（1/5 · 2/5 · 2/5）</option>
+          <option value="three_snack" selected>三餐 + 2 次加餐（20 / 5 / 30 / 5 / 30 / 10）</option>
+          <option value="six">少食多餐 6 餐（18 / 7 / 25 / 8 / 27 / 15）</option>
+          <option value="gastroparesis">胃轻瘫/餐后高血糖（15 / 10 / 20 / 10 / 20 / 10 / 15）</option>
+          <option value="custom">自定义</option>
+        </select>
+      </label>
+      <label class="inline">主食（谷薯）分配策略
+        <select id="carbStrategy">
+          <option value="even" selected>三餐均分，加餐以蛋白/水果为主</option>
+          <option value="front">早餐略多（防上午低血糖）</option>
+          <option value="back">晚餐略少（防空腹高血糖）</option>
+        </select>
+      </label>
+      <label class="inline">模板口味
+        <select id="flavorPref">
+          <option value="cn" selected>中式家常（默认）</option>
+          <option value="simple">简易快手（少油少盐、10 分钟）</option>
+          <option value="veg">素食为主</option>
+          <option value="lowgi">低 GI 强化</option>
+        </select>
+      </label>
+      <button id="btnGenPlan" class="btn">重新生成配餐模板</button>
+    </div>
+    <div id="mealPctBox" class="pct-box"></div>
+  </div>
+
+  <div class="card">
+    <h2>一日配餐模板（交换份法）</h2>
+    <div id="planWrap"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>全天营养合计 vs 目标</h2>
+      <div id="dayNutri"></div>
+    </div>
+    <div class="card">
+      <h2>血糖负荷（GL）与 GI 分布</h2>
+      <div id="glycemicBox"></div>
+      <p class="hint">GL = GI × 可利用碳水(g) / 100。全天 GL ≤ 80 较理想；单餐 GL ≤ 25 有利于餐后血糖平稳。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>配餐基本要求自检</h2>
+    <table class="tbl" id="checkTbl"></table>
+  </div>
+</section>
+
+<!-- ============ ③ 平替 ============ -->
+<section id="tab-swap" class="tabpane">
+  <div class="grid2">
+    <div class="card">
+      <h2>食材平替</h2>
+      <div class="form-grid">
+        <label>要替换的食材
+          <select id="swapFrom"></select>
+        </label>
+        <label>替换方式
+          <select id="swapMode">
+            <option value="carb">按碳水等价（推荐，餐后血糖最稳）</option>
+            <option value="energy">按能量等价</option>
+            <option value="protein">按蛋白质等价</option>
+          </select>
+        </label>
+        <label>筛选条件
+          <div class="checks">
+            <label class="chk"><input type="checkbox" id="swapLowGI" checked> 仅显示 GI 不高于原食材</label>
+            <label class="chk"><input type="checkbox" id="swapSameCat" checked> 仅同类食物交换份</label>
+          </div>
+        </label>
+      </div>
+      <div id="swapCandidates"></div>
+    </div>
+    <div class="card">
+      <h2>替换对比</h2>
+      <div id="swapCompare" class="hint">从左侧选择候选食材，即可看到等量替换后的营养素与 GL 变化。</div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>食物成分与 GI 查询</h2>
+    <div class="row wrap">
+      <label class="inline">搜索 <input id="foodSearch" type="text" placeholder="如：米饭 / 燕麦 / 苹果"></label>
+      <label class="inline">分类 <select id="foodCatFilter"></select></label>
+      <label class="inline">排序
+        <select id="foodSort">
+          <option value="name">按名称</option>
+          <option value="gi">按 GI 升序</option>
+          <option value="gl">按 GL 升序</option>
+          <option value="kcal">按能量升序</option>
+        </select>
+      </label>
+    </div>
+    <div class="scroll-y"><table class="tbl" id="foodTbl"></table></div>
+  </div>
+</section>
+
+<!-- ============ ④ 血糖 · 运动 ============ -->
+<section id="tab-glucose" class="tabpane">
+  <div class="grid2">
+    <div class="card">
+      <h2>实时血糖录入</h2>
+      <div class="form-grid">
+        <label>测量时间 <input id="gTime" type="datetime-local"></label>
+        <label>当前血糖 mmol/L <input id="gValue" type="number" step="0.1" placeholder="如 8.6"></label>
+        <label>血糖仪趋势 / CGM 箭头
+          <select id="gTrend">
+            <option value="flat">→ 平稳（±0.5 mmol/L/15min）</option>
+            <option value="up1">↗ 缓升</option>
+            <option value="up2">↑ 上升</option>
+            <option value="up3">↑↑ 快速上升（&gt;2.2/15min）</option>
+            <option value="down1">↘ 缓降</option>
+            <option value="down2">↓ 下降</option>
+            <option value="down3">↓↓ 快速下降</option>
+          </select>
+        </label>
+        <label>测量时段
+          <select id="gPhase">
+            <option value="premeal">餐前</option>
+            <option value="post1">餐后 1 小时</option>
+            <option value="post2" selected>餐后 2 小时</option>
+            <option value="fasting">空腹 / 清晨</option>
+            <option value="bed">睡前</option>
+            <option value="night">夜间 0–3 点</option>
+            <option value="exercise_pre">运动前</option>
+            <option value="exercise_post">运动后</option>
+          </select>
+        </label>
+        <label>距上一餐（分钟） <input id="gSinceMeal" type="number" step="5" placeholder="如 180"></label>
+        <label>是否出现低血糖症状
+          <select id="gSymptoms"><option value="no">无</option><option value="yes">心慌、出汗、手抖、饥饿、头晕</option><option value="severe">意识模糊 / 需他人帮助</option></select>
+        </label>
+        <label>下一步计划
+          <select id="gNext">
+            <option value="meal" selected>即将进餐</option>
+            <option value="exercise">即将运动</option>
+            <option value="sleep">准备睡觉</option>
+            <option value="none">暂不安排</option>
+          </select>
+        </label>
+        <label>计划运动强度
+          <select id="gExIntensity">
+            <option value="low">低强度（散步、家务）</option>
+            <option value="mod" selected>中等强度（快走、骑车、太极、游泳）</option>
+            <option value="high">较大强度（跑步、跳绳、球类、抗阻）</option>
+            <option value="hiit">高强度间歇 / 大重量抗阻</option>
+          </select>
+        </label>
+        <label>计划运动时长（分钟） <input id="gExMin" type="number" value="30" step="5"></label>
+        <label>酮体情况
+          <select id="gKetone">
+            <option value="unknown">未测</option>
+            <option value="neg">阴性</option>
+            <option value="pos">阳性 / 尿酮 + 以上</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <button id="btnGlucose" class="btn">计算进餐与运动方案</button>
+        <button id="btnGlucoseDemo" class="btn ghost">载入示例读数</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>即时建议 <span class="badge" id="gLevelBadge"></span></h2>
+      <div id="gOut" class="hint">录入血糖后点击「计算进餐与运动方案」。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>时间轴（进餐 · 加餐 · 运动 · 监测）</h2>
+    <div id="timeline"></div>
+  </div>
+
+  <div class="card">
+    <h2>调整后的当日配餐（随血糖自动改量改种类）</h2>
+    <div id="adjustedPlan"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>连续血糖数据（CGM / 血糖仪记录）</h2>
+      <p class="hint">支持两种录入：① 直接粘贴「时间,血糖」两列（逗号/制表符/空格分隔，可含表头）；② 选择 CGM 导出的 CSV 文件（雅培瞬感、硅基、三诺等导出格式均可尝试，程序会自动识别时间与血糖列）。</p>
+      <textarea id="cgmText" rows="6" placeholder="2025-01-01 07:30, 7.2&#10;2025-01-01 08:00, 8.9&#10;..."></textarea>
+      <div class="row wrap">
+        <input type="file" id="cgmFile" accept=".csv,.txt">
+        <button id="btnCgm" class="btn">分析连续血糖</button>
+        <button id="btnCgmDemo" class="btn ghost">载入示例 CGM</button>
+      </div>
+      <div id="cgmOut"></div>
+    </div>
+    <div class="card">
+      <h2>血糖曲线</h2>
+      <canvas id="cgmChart" width="640" height="240"></canvas>
+      <div class="hint">绿色区间 3.9–10.0 mmol/L（TIR）；红色虚线为低血糖 3.9、高血糖 10.0 与 13.9。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ⑤ 数据 ============ -->
+<section id="tab-data" class="tabpane">
+  <div class="grid2">
+    <div class="card">
+      <h2>食物库</h2>
+      <p class="hint">食物库为本地数据，可导出为 JSON 用 Excel 修改后再导入，以适配你所在机构的《中国食物成分表》版本与常用食材。</p>
+      <div class="row wrap">
+        <button id="btnFoodExport" class="btn">导出食物库 JSON</button>
+        <input type="file" id="foodImport" accept=".json">
+        <button id="btnFoodReset" class="btn ghost">恢复默认食物库</button>
+      </div>
+      <table class="tbl compact" id="foodStatTbl"></table>
+    </div>
+    <div class="card">
+      <h2>本机存档</h2>
+      <div id="storeList"></div>
+      <div class="row wrap">
+        <button id="btnStoreRefresh" class="btn ghost">刷新列表</button>
+      </div>
+      <h3>导入 / 导出患者数据</h3>
+      <textarea id="dataJson" rows="6" placeholder="导出的 JSON 会显示在这里，也可粘贴 JSON 后点击「导入数据」"></textarea>
+      <div class="row"><button id="btnImport" class="btn">导入数据</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>规则阈值（可自行调整，默认值为指南常用值）</h2>
+    <table class="tbl" id="ruleTbl"></table>
+  </div>
+  <div class="card">
+    <h2>免责声明与数据来源</h2>
+    <p class="hint">
+      本工具用于营养师日常配餐计算与患者教育，属于辅助计算工具，不构成诊疗意见，不能替代医师处方与营养师面诊。
+      血糖异常（尤其 &lt;3.0 或 &gt;13.9 mmol/L、酮体阳性、意识改变）请立即按机构流程处理并联系医生。
+      食物成分数据参考《中国食物成分表》与公开发表的 GI 数据，请结合本机构版本核对后使用。
+    </p>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <span>本地单机运行 · 无网络请求 · 数据保存在浏览器 localStorage</span>
+  <span id="verTag"></span>
+</footer>
+
+
+
+
+<script>
+  window.__errs = [];
+  window.addEventListener('error', function (e) {
+    window.__errs.push(String(e.message));
+    var b = document.getElementById('jsErr');
+    if (b) { b.style.display = 'block'; b.textContent = '脚本错误：' + e.message + '（' + (e.filename || '') + ' 第 ' + (e.lineno || '') + ' 行）'; }
+  });
+</script>
+
+<script>
+/* ==== data-foods.js ==== */
+/* 自动生成，请勿手工编辑 —— 生成脚本 tools/build_food_db.py */
+/*
+  数据来源：
+   1) 《中国食物成分表（标准版 第6版）》能量与一般营养成分（Sanotsu/china-food-composition-data 整理）
+   2) 同上仓库食物血糖生成指数（GI）附表，共 259 条
+  换算约定：1 交换份 = 90 kcal；exch100 = 每 100 g 可食部折合交换份数
+  GI 标记：giEst=true 表示 GI 表未直接收录、按同类食物或文献常用值估算，请结合本机构资料核对
+*/
+window.FOOD_DB = [
+  {id: "F001", name: "米饭（蒸，代表值）", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012401x", kcal: 116, pro: 2.6, fat: 0.3, cho: 25.9, fib: 0.3, fibEst: false, na: 2.5, chol: 0, k: 30, gi: 83, giEst: false, giSrc: "GI 表：大米饭（粳米精米 90／籼米精米 82）取均值", unitG: 150, unitName: "1 小碗（150 g）", tags: ["refined", "stapleMain"], exch100: 1.29},
+  {id: "F002", name: "粳米饭（蒸）", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012402", kcal: 118, pro: 2.6, fat: 0.3, cho: 26.2, fib: 0.2, fibEst: false, na: 3.3, chol: 0, k: 39, gi: 90, giEst: false, giSrc: "GI 表：大米饭（粳米，精米）90", unitG: 150, unitName: "1 小碗（150 g）", tags: ["refined", "highGI"], exch100: 1.31},
+  {id: "F003", name: "籼米饭（蒸）", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012408", kcal: 117, pro: 3, fat: 0.4, cho: 26.4, fib: 0.3, fibEst: true, na: 1.7, chol: 0, k: 21, gi: 82, giEst: false, giSrc: "GI 表：大米饭（籼米，精米）82", unitG: 150, unitName: "1 小碗（150 g）", tags: ["refined", "highGI"], exch100: 1.3},
+  {id: "F004", name: "粳米粥", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012404", kcal: 46, pro: 1.1, fat: 0.3, cho: 9.9, fib: 0.1, fibEst: false, na: 2.8, chol: 0, k: 13, gi: 69, giEst: false, giSrc: "GI 表：大米粥 69", unitG: 200, unitName: "1 碗（200 g）", tags: ["refined", "highGI", "porridge"], exch100: 0.51},
+  {id: "F005", name: "小米粥", cat: "grain", srcCat: "谷类及其制品-小米黄米", code: "015103", kcal: 46, pro: 1.4, fat: 0.7, cho: 8.4, fib: 0.7, fibEst: true, na: 4.1, chol: 0, k: 19, gi: 60, giEst: false, giSrc: "GI 表：小米粥 60", unitG: 200, unitName: "1 碗（200 g）", tags: ["porridge"], exch100: 0.51},
+  {id: "F006", name: "馒头（代表值）", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011404x", kcal: 223, pro: 7, fat: 1.1, cho: 47, fib: 1.3, fibEst: false, na: 165.1, chol: 0, k: 138, gi: 85, giEst: false, giSrc: "GI 表：馒头（精制小麦粉）85", unitG: 100, unitName: "1 个（100 g）", tags: ["refined", "highGI"], exch100: 2.48},
+  {id: "F007", name: "花卷", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011401", kcal: 214, pro: 6.4, fat: 1, cho: 45.6, fib: 1.5, fibEst: false, na: 95, chol: 0, k: 83, gi: 85, giEst: true, giSrc: "按馒头（精制小麦粉）85 近似", unitG: 90, unitName: "1 个（90 g）", tags: ["refined", "highGI"], exch100: 2.38},
+  {id: "F008", name: "烙饼（标准粉）", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011403", kcal: 258, pro: 7.5, fat: 2.3, cho: 52.9, fib: 1.9, fibEst: false, na: 149.3, chol: 0, k: 141, gi: 80, giEst: false, giSrc: "GI 表：烙饼 80", unitG: 100, unitName: "1 张（100 g）", tags: ["refined", "highGI", "fried"], exch100: 2.87},
+  {id: "F009", name: "挂面（代表值）", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011301x", kcal: 353, pro: 11.4, fat: 0.9, cho: 75.1, fib: 0.9, fibEst: false, na: 184.5, chol: 0, k: 129, gi: 55, giEst: false, giSrc: "GI 表：挂面（精制小麦粉）55", unitG: null, unitName: null, tags: ["refined", "dry"], exch100: 3.92},
+  {id: "F010", name: "面条（富强粉，煮）", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011317", kcal: 107, pro: 3.9, fat: 0.4, cho: 22.8, fib: 0.4, fibEst: true, na: 26.9, chol: 0, k: 15, gi: 41, giEst: false, giSrc: "GI 表：面条（白细，煮）41", unitG: 250, unitName: "1 碗（250 g）", tags: ["cookedNoodle"], exch100: 1.19},
+  {id: "F011", name: "面条（生，代表值）", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011305x", kcal: 301, pro: 8.9, fat: 0.6, cho: 65.6, fib: 0.8, fibEst: false, na: 21.4, chol: 0, k: 123, gi: 55, giEst: false, giSrc: "GI 表：面条（硬质小麦粉，细）55", unitG: null, unitName: null, tags: ["refined"], exch100: 3.34},
+  {id: "F012", name: "荞麦面", cat: "grain", srcCat: "谷类及其制品-其他", code: "019010", kcal: 340, pro: 11.3, fat: 2.8, cho: 70.2, fib: 2.5, fibEst: true, na: 0.9, chol: 0, k: 304, gi: 59, giEst: false, giSrc: "GI 表：荞麦面条 59", unitG: null, unitName: null, tags: ["wholeGrain", "buckwheat"], exch100: 3.78},
+  {id: "F013", name: "玉米面（黄）", cat: "grain", srcCat: "谷类及其制品-玉米", code: "013109", kcal: 350, pro: 8.5, fat: 1.5, cho: 78.4, fib: 5.6, fibEst: true, na: 2.3, chol: 0, k: 249, gi: 68, giEst: false, giSrc: "GI 表：玉米面（粗粉，煮）68", unitG: null, unitName: null, tags: ["wholeGrain", "coarse"], exch100: 3.89},
+  {id: "F014", name: "玉米（鲜）", cat: "grain", srcCat: "谷类及其制品-玉米", code: "013101", kcal: 112, pro: 4, fat: 1.2, cho: 22.8, fib: 2.9, fibEst: false, na: 1.1, chol: 0, k: 238, gi: 55, giEst: false, giSrc: "GI 表：玉米（甜，煮）55", unitG: 200, unitName: "1 根（200 g）", tags: ["wholeGrain", "coarse"], exch100: 1.24},
+  {id: "F015", name: "小米", cat: "grain", srcCat: "谷类及其制品-小米黄米", code: "015101", kcal: 361, pro: 9, fat: 3.1, cho: 75.1, fib: 1.6, fibEst: false, na: 4.3, chol: 0, k: 284, gi: 71, giEst: false, giSrc: "GI 表：小米（煮）71", unitG: null, unitName: null, tags: ["wholeGrain", "coarse"], exch100: 4.01},
+  {id: "F016", name: "燕麦", cat: "grain", srcCat: "谷类及其制品-其他", code: "019012", kcal: 338, pro: 10.1, fat: 0.2, cho: 77.4, fib: 6, fibEst: false, na: 2.1, chol: 0, k: 356, gi: 42, giEst: false, giSrc: "GI 表：燕麦饭（整粒）42", unitG: null, unitName: null, tags: ["wholeGrain", "oat", "lowGI"], exch100: 3.76},
+  {id: "F017", name: "藜麦（散装）", cat: "grain", srcCat: "谷类及其制品-其他", code: "019013", kcal: 357, pro: 14, fat: 6, cho: 57.8, fib: 6.5, fibEst: false, na: 1, chol: 0, k: 362, gi: 53, giEst: true, giSrc: "文献常用值约 53（GI 表未收录）", unitG: null, unitName: null, tags: ["wholeGrain", "lowGI"], exch100: 3.97},
+  {id: "F018", name: "糙米", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012216", kcal: 348, pro: 7.7, fat: 2.7, cho: 75, fib: 3.4, fibEst: false, na: 5.4, chol: 0, k: 230, gi: 71, giEst: false, giSrc: "GI 表：大米饭（籼米，糙米）71", unitG: null, unitName: null, tags: ["wholeGrain", "brownRice"], exch100: 3.87},
+  {id: "F019", name: "黑米", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012212", kcal: 341, pro: 9.4, fat: 2.5, cho: 72.2, fib: 3.9, fibEst: false, na: 7.1, chol: 0, k: 256, gi: 55, giEst: false, giSrc: "GI 表：黑米饭 55", unitG: null, unitName: null, tags: ["wholeGrain", "lowGI"], exch100: 3.79},
+  {id: "F020", name: "薏米［薏仁米，苡米］", cat: "grain", srcCat: "谷类及其制品-其他", code: "019008", kcal: 361, pro: 12.8, fat: 3.3, cho: 71.1, fib: 2, fibEst: false, na: 3.6, chol: 0, k: 238, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["wholeGrain"], exch100: 4.01},
+  {id: "F021", name: "高粱米", cat: "grain", srcCat: "谷类及其制品-其他", code: "019001", kcal: 360, pro: 10.4, fat: 3.1, cho: 74.7, fib: 4.3, fibEst: false, na: 6.3, chol: 0, k: 281, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["wholeGrain"], exch100: 4},
+  {id: "F022", name: "大麦［元麦］", cat: "grain", srcCat: "谷类及其制品-大麦", code: "014101", kcal: 327, pro: 10.2, fat: 1.4, cho: 73.3, fib: 9.9, fibEst: false, na: null, chol: 0, k: 49, gi: 25, giEst: false, giSrc: "GI 表：大麦（整粒，煮）25", unitG: null, unitName: null, tags: ["wholeGrain", "lowGI"], exch100: 3.63},
+  {id: "F023", name: "青稞", cat: "grain", srcCat: "谷类及其制品-大麦", code: "014202", kcal: 342, pro: 8.1, fat: 1.5, cho: 75, fib: 1.8, fibEst: false, na: 77, chol: 0, k: 644, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["wholeGrain"], exch100: 3.8},
+  {id: "F024", name: "玉米糁（黄）", cat: "grain", srcCat: "谷类及其制品-玉米", code: "013110", kcal: 326, pro: 7.4, fat: 1.2, cho: 78.7, fib: 6.2, fibEst: true, na: 1.7, chol: 0, k: 177, gi: 51, giEst: false, giSrc: "GI 表：玉米糁粥 51", unitG: null, unitName: null, tags: ["wholeGrain", "coarse"], exch100: 3.62},
+  {id: "F025", name: "马铃薯（蒸）", cat: "grain", srcCat: "薯类淀粉及其制品-薯类", code: "021106", kcal: 69, pro: 3, fat: 0, cho: 15.3, fib: 0.2, fibEst: false, na: 3, chol: 0, k: 484, gi: 66, giEst: false, giSrc: "GI 表：马铃薯（蒸）66", unitG: 150, unitName: "1 个（150 g）", tags: ["potato", "stapleSwap"], exch100: 0.77},
+  {id: "F026", name: "甘薯（红心）［山芋、红薯］", cat: "grain", srcCat: "薯类淀粉及其制品-薯类", code: "021205", kcal: 61, pro: 0.7, fat: 0.2, cho: 15.3, fib: 1.6, fibEst: true, na: 70.9, chol: 0, k: 88, gi: 77, giEst: false, giSrc: "GI 表：甘薯（红，煮）77", unitG: 150, unitName: "1 个（150 g）", tags: ["potato", "stapleSwap", "highGI"], exch100: 0.68},
+  {id: "F027", name: "山药（鲜）［薯蓣，大薯］", cat: "grain", srcCat: "蔬菜类及其制品-薯芋类", code: "047104", kcal: 57, pro: 1.9, fat: 0.2, cho: 12.4, fib: 0.8, fibEst: false, na: 18.6, chol: 0, k: 213, gi: 51, giEst: false, giSrc: "GI 表：山药（薯蓣）51", unitG: null, unitName: null, tags: ["potato", "stapleSwap", "lowGI"], exch100: 0.63},
+  {id: "F028", name: "芋头［芋艿、毛芋］", cat: "grain", srcCat: "蔬菜类及其制品-薯芋类", code: "047203", kcal: 56, pro: 1.3, fat: 0.2, cho: 12.7, fib: 1, fibEst: false, na: 5.5, chol: 0, k: 25, gi: 48, giEst: false, giSrc: "GI 表：芋头（蒸芋艿／毛芋）48", unitG: null, unitName: null, tags: ["potato", "stapleSwap", "lowGI"], exch100: 0.62},
+  {id: "F029", name: "藕［莲藕］", cat: "grain", srcCat: "蔬菜类及其制品-水生蔬菜类", code: "046010", kcal: 47, pro: 1.2, fat: 0.2, cho: 11.5, fib: 2.2, fibEst: false, na: 34.3, chol: 0, k: 293, gi: 38, giEst: true, giSrc: "文献常用值约 38（GI 表未收录）", unitG: null, unitName: null, tags: ["potato", "stapleSwap", "highCarbVeg"], exch100: 0.52},
+  {id: "F030", name: "荸荠（鲜）［马蹄，地栗］", cat: "grain", srcCat: "蔬菜类及其制品-水生蔬菜类", code: "046008", kcal: 61, pro: 1.2, fat: 0.2, cho: 14.2, fib: 1.1, fibEst: false, na: 15.7, chol: 0, k: 306, gi: 40, giEst: true, giSrc: "文献常用值约 40（GI 表未收录）", unitG: null, unitName: null, tags: ["potato", "stapleSwap", "highCarbVeg"], exch100: 0.68},
+  {id: "F031", name: "粉丝", cat: "grain", srcCat: "薯类淀粉及其制品-淀粉类", code: "022201", kcal: 338, pro: 0.8, fat: 0.2, cho: 83.7, fib: 1.1, fibEst: false, na: 9.3, chol: 0, k: 18, gi: 32, giEst: true, giSrc: "GI 表：粉丝汤（豌豆）32（近似）", unitG: null, unitName: null, tags: ["starch", "pureCarb"], exch100: 3.76},
+  {id: "F032", name: "粉条", cat: "grain", srcCat: "薯类淀粉及其制品-淀粉类", code: "022203", kcal: 338, pro: 0.5, fat: 0.1, cho: 84.2, fib: 0.6, fibEst: false, na: 9.6, chol: 0, k: 18, gi: 13.6, giEst: false, giSrc: "GI 表：马铃薯粉条 13.6", unitG: null, unitName: null, tags: ["starch", "pureCarb"], exch100: 3.76},
+  {id: "F033", name: "藕粉", cat: "grain", srcCat: "薯类淀粉及其制品-淀粉类", code: "022105", kcal: 373, pro: 0.2, fat: 0, cho: 93, fib: 0.1, fibEst: false, na: 10.8, chol: 0, k: 35, gi: 33, giEst: false, giSrc: "GI 表：藕粉 33", unitG: null, unitName: null, tags: ["starch", "pureCarb"], exch100: 4.14},
+  {id: "F034", name: "米粉", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012410", kcal: 349, pro: 0.4, fat: 0.8, cho: 85.8, fib: 0.3, fibEst: true, na: 52.2, chol: 0, k: 19, gi: 54, giEst: false, giSrc: "GI 表：米粉 54", unitG: null, unitName: null, tags: ["refined", "riceNoodle"], exch100: 3.88},
+  {id: "F035", name: "河粉", cat: "grain", srcCat: "谷类及其制品-稻米", code: "012411", kcal: 359, pro: 7.7, fat: 1.5, cho: 79.2, fib: 0.4, fibEst: true, na: 8.2, chol: 0, k: 83, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["refined", "riceNoodle"], exch100: 3.99},
+  {id: "F036", name: "通心面［通心粉］", cat: "grain", srcCat: "谷类及其制品-小麦", code: "011312", kcal: 351, pro: 11.9, fat: 0.1, cho: 75.8, fib: 0.4, fibEst: false, na: 35, chol: 0, k: 209, gi: 45, giEst: false, giSrc: "GI 表：通心面（管状，粗）45", unitG: null, unitName: null, tags: ["refined", "lowGI", "pasta"], exch100: 3.9},
+  {id: "F037", name: "大白菜（代表值）", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045101x", kcal: 20, pro: 1.6, fat: 0.2, cho: 3.4, fib: 0.9, fibEst: false, na: 68.9, chol: 0, k: 134, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.22},
+  {id: "F038", name: "菠菜（鲜）［赤根菜］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045301", kcal: 28, pro: 2.6, fat: 0.3, cho: 4.5, fib: 1.7, fibEst: false, na: 85.2, chol: 0, k: 311, gi: 15, giEst: false, giSrc: "GI 表：菠菜 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.31},
+  {id: "F039", name: "油菜", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045125", kcal: 14, pro: 1.3, fat: 0.5, cho: 2, fib: 1.1, fibEst: true, na: 73.7, chol: 0, k: 175, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.16},
+  {id: "F040", name: "芹菜茎", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045312", kcal: 22, pro: 1.2, fat: 0.2, cho: 4.5, fib: 1.2, fibEst: false, na: 159, chol: 0, k: 206, gi: 15, giEst: false, giSrc: "GI 表：芹菜 15", unitG: null, unitName: null, tags: ["darkVeg", "stem"], exch100: 0.24},
+  {id: "F041", name: "韭菜", cat: "veg", srcCat: "蔬菜类及其制品-葱蒜类", code: "044404", kcal: 25, pro: 2.4, fat: 0.4, cho: 4.5, fib: 1.4, fibEst: true, na: 5.8, chol: 0, k: 241, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.28},
+  {id: "F042", name: "生菜［叶用莴苣］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045333", kcal: 12, pro: 1.6, fat: 0.4, cho: 1.1, fib: 0.7, fibEst: true, na: 16.1, chol: 0, k: 91, gi: 15, giEst: false, giSrc: "GI 表：生菜 15", unitG: null, unitName: null, tags: ["leafy"], exch100: 0.13},
+  {id: "F043", name: "西兰花［绿菜花］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045217", kcal: 27, pro: 3.5, fat: 0.6, cho: 3.7, fib: 1.6, fibEst: true, na: 46.7, chol: 0, k: 179, gi: 15, giEst: false, giSrc: "GI 表：绿菜花 15", unitG: null, unitName: null, tags: ["darkVeg", "crucifer"], exch100: 0.3},
+  {id: "F044", name: "菜花（白色）［花椰菜］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045216", kcal: 20, pro: 1.7, fat: 0.2, cho: 4.2, fib: 2.1, fibEst: false, na: 39.2, chol: 0, k: 206, gi: 15, giEst: false, giSrc: "GI 表：菜花 15", unitG: null, unitName: null, tags: ["crucifer"], exch100: 0.22},
+  {id: "F045", name: "芦笋（绿）［石刁柏、龙须菜］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045415", kcal: 19, pro: 2.6, fat: 0.1, cho: 3.3, fib: 1.3, fibEst: true, na: 12.4, chol: 0, k: 304, gi: 15, giEst: false, giSrc: "GI 表：芦笋 15", unitG: null, unitName: null, tags: ["darkVeg"], exch100: 0.21},
+  {id: "F046", name: "茼蒿（鲜）［蓬蒿菜，艾菜］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045321", kcal: 24, pro: 1.9, fat: 0.3, cho: 3.9, fib: 1.2, fibEst: false, na: 161.3, chol: 0, k: 220, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.27},
+  {id: "F047", name: "蕹菜［空心菜、藤藤菜］", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045337", kcal: 19, pro: 2.2, fat: 0.2, cho: 4, fib: 1.4, fibEst: true, na: 107.6, chol: 0, k: 304, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.21},
+  {id: "F048", name: "苋菜（绿，鲜）", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045319", kcal: 30, pro: 2.8, fat: 0.3, cho: 5, fib: 2.2, fibEst: false, na: 32.4, chol: 0, k: 207, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg", "leafy"], exch100: 0.33},
+  {id: "F049", name: "竹笋（鲜）", cat: "veg", srcCat: "蔬菜类及其制品-嫩茎叶花菜类", code: "045401", kcal: 23, pro: 2.6, fat: 0.2, cho: 3.6, fib: 1.8, fibEst: false, na: 0.4, chol: 0, k: 389, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["leafy"], exch100: 0.26},
+  {id: "F050", name: "黄瓜（鲜）［胡瓜］", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043208", kcal: 16, pro: 0.8, fat: 0.2, cho: 2.9, fib: 0.5, fibEst: false, na: 4.9, chol: 0, k: 102, gi: 15, giEst: false, giSrc: "GI 表：黄瓜 15", unitG: null, unitName: null, tags: ["lowCal", "melon"], exch100: 0.18},
+  {id: "F051", name: "番茄［西红柿］", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043119", kcal: 15, pro: 0.9, fat: 0.2, cho: 3.3, fib: 0.5, fibEst: true, na: 9.7, chol: 0, k: 179, gi: 15, giEst: false, giSrc: "GI 表：西红柿 15", unitG: null, unitName: null, tags: ["darkVeg", "solanum"], exch100: 0.17},
+  {id: "F052", name: "茄子（代表值）", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043101x", kcal: 23, pro: 1.1, fat: 0.2, cho: 4.9, fib: 1.3, fibEst: false, na: 5.4, chol: 0, k: 142, gi: 15, giEst: false, giSrc: "GI 表：茄子 15", unitG: null, unitName: null, tags: ["solanum"], exch100: 0.26},
+  {id: "F053", name: "苦瓜（鲜）［凉瓜，癞瓜］", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043212", kcal: 22, pro: 1, fat: 0.1, cho: 4.9, fib: 1.4, fibEst: false, na: 2.5, chol: 0, k: 256, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg"], exch100: 0.24},
+  {id: "F054", name: "冬瓜", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043221", kcal: 10, pro: 0.3, fat: 0.2, cho: 2.4, fib: 0.7, fibEst: true, na: 2.8, chol: 0, k: 57, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["lowCal", "melon"], exch100: 0.11},
+  {id: "F055", name: "南瓜（鲜）［倭瓜，番瓜］", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043213", kcal: 23, pro: 0.7, fat: 0.1, cho: 5.3, fib: 0.8, fibEst: false, na: 0.8, chol: 0, k: 145, gi: 75, giEst: false, giSrc: "GI 表：南瓜（倭瓜、番瓜）75", unitG: null, unitName: null, tags: ["highGI", "highCarbVeg", "solanum"], exch100: 0.26},
+  {id: "F056", name: "甜椒［灯笼椒、柿子椒］", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043124", kcal: 18, pro: 1, fat: 0.2, cho: 3.8, fib: 1.4, fibEst: true, na: null, chol: 0, k: null, gi: 15, giEst: false, giSrc: "GI 表：青椒 15", unitG: null, unitName: null, tags: ["darkVeg", "solanum"], exch100: 0.2},
+  {id: "F057", name: "洋葱（鲜）［葱头］", cat: "veg", srcCat: "蔬菜类及其制品-葱蒜类", code: "044301", kcal: 40, pro: 1.1, fat: 0.2, cho: 9, fib: 0.9, fibEst: false, na: 4.4, chol: 0, k: 147, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["allium"], exch100: 0.44},
+  {id: "F058", name: "胡萝卜", cat: "veg", srcCat: "蔬菜类及其制品-根菜类", code: "041204", kcal: 32, pro: 1, fat: 0.2, cho: 8.1, fib: 1.1, fibEst: true, na: 120.7, chol: 0, k: 119, gi: 71, giEst: false, giSrc: "GI 表：胡萝卜（金笋）71", unitG: null, unitName: null, tags: ["highGI", "highCarbVeg", "root"], exch100: 0.36},
+  {id: "F059", name: "绿豆芽", cat: "veg", srcCat: "蔬菜类及其制品-鲜豆类", code: "042206", kcal: 16, pro: 1.7, fat: 0.1, cho: 2.6, fib: 1.2, fibEst: false, na: 25.8, chol: 0, k: 32, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["sprout"], exch100: 0.18},
+  {id: "F060", name: "黄豆芽", cat: "veg", srcCat: "蔬菜类及其制品-鲜豆类", code: "042202", kcal: 47, pro: 4.5, fat: 1.6, cho: 4.5, fib: 1.5, fibEst: false, na: 7.2, chol: 0, k: 160, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["sprout"], exch100: 0.52},
+  {id: "F061", name: "豆角", cat: "veg", srcCat: "蔬菜类及其制品-鲜豆类", code: "042104", kcal: 34, pro: 2.5, fat: 0.2, cho: 6.7, fib: 2.1, fibEst: false, na: 3.4, chol: 0, k: 207, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["bean", "legumeVeg"], exch100: 0.38},
+  {id: "F062", name: "荷兰豆", cat: "veg", srcCat: "蔬菜类及其制品-鲜豆类", code: "042106", kcal: 30, pro: 2.5, fat: 0.3, cho: 4.9, fib: 1.4, fibEst: false, na: 8.8, chol: 0, k: 116, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["bean", "legumeVeg"], exch100: 0.33},
+  {id: "F063", name: "秋葵［黄秋葵、羊角豆］", cat: "veg", srcCat: "蔬菜类及其制品-茄果瓜菜类", code: "043126", kcal: 25, pro: 1.8, fat: 0.2, cho: 6.2, fib: 1.8, fibEst: false, na: 8.7, chol: 0, k: 19, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["darkVeg"], exch100: 0.28},
+  {id: "F064", name: "木耳（水发）［黑木耳，云耳］", cat: "veg", srcCat: "菌藻类-菌类", code: "051014", kcal: 27, pro: 1.5, fat: 0.2, cho: 6, fib: 2.6, fibEst: false, na: 8.5, chol: 0, k: 52, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["fungus"], exch100: 0.3},
+  {id: "F065", name: "香菇（鲜）［香蕈，冬菇］", cat: "veg", srcCat: "菌藻类-菌类", code: "051019", kcal: 26, pro: 2.2, fat: 0.3, cho: 5.2, fib: 3.3, fibEst: false, na: 1.4, chol: 0, k: 20, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["fungus", "umami"], exch100: 0.29},
+  {id: "F066", name: "海带（浸）［江白菜，昆布］", cat: "veg", srcCat: "菌藻类-藻类", code: "052004", kcal: 16, pro: 1.1, fat: 0.1, cho: 3, fib: 0.9, fibEst: false, na: 107.6, chol: 0, k: 222, gi: 15, giEst: true, giSrc: "非淀粉类蔬菜，按 GI 表惯例取 15", unitG: null, unitName: null, tags: ["seaweed", "iodine", "ckdCaution"], exch100: 0.18},
+  {id: "F067", name: "紫菜（干）", cat: "veg", srcCat: "菌藻类-藻类", code: "052008", kcal: 250, pro: 26.7, fat: 1.1, cho: 44.1, fib: 21.6, fibEst: false, na: 710.5, chol: 0, k: 1796, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["seaweed", "iodine", "ckdCaution"], exch100: 2.78},
+  {id: "F068", name: "苹果（代表值）", cat: "fruit", srcCat: "水果类及其制品-仁果类", code: "061101x", kcal: 53, pro: 0.4, fat: 0.2, cho: 13.7, fib: 1.7, fibEst: false, na: 1.3, chol: 0, k: 83, gi: 36, giEst: false, giSrc: "GI 表：苹果 36", unitG: 200, unitName: "1 个（200 g）", tags: ["lowGI"], exch100: 0.59},
+  {id: "F069", name: "梨（代表值）", cat: "fruit", srcCat: "水果类及其制品-仁果类", code: "061201x", kcal: 51, pro: 0.3, fat: 0.1, cho: 13.1, fib: 2.6, fibEst: false, na: 1.7, chol: 0, k: 85, gi: 36, giEst: false, giSrc: "GI 表：梨 36", unitG: 200, unitName: "1 个（200 g）", tags: ["lowGI"], exch100: 0.57},
+  {id: "F070", name: "桃（代表值）", cat: "fruit", srcCat: "水果类及其制品-核果类", code: "062101x", kcal: 42, pro: 0.6, fat: 0.1, cho: 10.1, fib: 1, fibEst: false, na: 1.7, chol: 0, k: 127, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: 150, unitName: "1 个（150 g）", tags: ["lowGI"], exch100: 0.47},
+  {id: "F071", name: "葡萄（代表值）", cat: "fruit", srcCat: "水果类及其制品-浆果类", code: "063101x", kcal: 45, pro: 0.4, fat: 0.3, cho: 10.3, fib: 1, fibEst: false, na: 1.9, chol: 0, k: 127, gi: 43, giEst: false, giSrc: "GI 表：葡萄 43", unitG: 100, unitName: "约 10 粒（100 g）", tags: ["lowGI"], exch100: 0.5},
+  {id: "F072", name: "中华猕猴桃［毛叶猕猴桃］", cat: "fruit", srcCat: "水果类及其制品-浆果类", code: "063909", kcal: 61, pro: 0.8, fat: 0.6, cho: 14.5, fib: 2.6, fibEst: false, na: 10, chol: 0, k: 144, gi: 52, giEst: false, giSrc: "GI 表：猕猴桃 52", unitG: 100, unitName: "1 个（100 g）", tags: ["vitC"], exch100: 0.68},
+  {id: "F073", name: "柚［文旦］", cat: "fruit", srcCat: "水果类及其制品-柑橘类", code: "064301", kcal: 42, pro: 0.8, fat: 0.2, cho: 9.5, fib: 0.4, fibEst: false, na: 3, chol: 0, k: 119, gi: 25, giEst: false, giSrc: "GI 表：柚 25", unitG: null, unitName: null, tags: ["lowGI"], exch100: 0.47},
+  {id: "F074", name: "橙", cat: "fruit", srcCat: "水果类及其制品-柑橘类", code: "064101", kcal: 48, pro: 0.8, fat: 0.2, cho: 11.1, fib: 0.6, fibEst: false, na: 1.2, chol: 0, k: 159, gi: 43, giEst: true, giSrc: "按 GI 表：柑（橘子）43 近似", unitG: 200, unitName: "1 个（200 g）", tags: ["lowGI"], exch100: 0.53},
+  {id: "F075", name: "蜜橘", cat: "fruit", srcCat: "水果类及其制品-柑橘类", code: "064206", kcal: 45, pro: 0.8, fat: 0.4, cho: 10.3, fib: 1.4, fibEst: false, na: 1.3, chol: 0, k: 177, gi: 43, giEst: false, giSrc: "GI 表：柑（橘子）43", unitG: 100, unitName: "1 个（100 g）", tags: ["lowGI"], exch100: 0.5},
+  {id: "F076", name: "草莓［洋莓，凤阳草莓］", cat: "fruit", srcCat: "水果类及其制品-浆果类", code: "063910", kcal: 32, pro: 1, fat: 0.2, cho: 7.1, fib: 1.1, fibEst: false, na: 4.2, chol: 0, k: 131, gi: 32, giEst: true, giSrc: "文献常用值约 32（GI 表未收录）", unitG: null, unitName: null, tags: ["lowGI"], exch100: 0.36},
+  {id: "F077", name: "樱桃", cat: "fruit", srcCat: "水果类及其制品-核果类", code: "062902", kcal: 46, pro: 1.1, fat: 0.2, cho: 10.2, fib: 0.3, fibEst: false, na: 8, chol: 0, k: 232, gi: 22, giEst: false, giSrc: "GI 表：樱桃 22", unitG: null, unitName: null, tags: ["lowGI"], exch100: 0.51},
+  {id: "F078", name: "西瓜（代表值）", cat: "fruit", srcCat: "水果类及其制品-瓜果类", code: "066201x", kcal: 31, pro: 0.5, fat: 0.3, cho: 6.8, fib: 0.2, fibEst: false, na: 3.3, chol: 0, k: 97, gi: 72, giEst: false, giSrc: "GI 表：西瓜 72", unitG: null, unitName: null, tags: ["highGI", "summer"], exch100: 0.34},
+  {id: "F079", name: "哈密瓜", cat: "fruit", srcCat: "水果类及其制品-瓜果类", code: "066103", kcal: 34, pro: 0.5, fat: 0.1, cho: 7.9, fib: 0.2, fibEst: false, na: 26.7, chol: 0, k: 190, gi: 70, giEst: false, giSrc: "GI 表：哈密瓜 70", unitG: null, unitName: null, tags: ["highGI", "summer"], exch100: 0.38},
+  {id: "F080", name: "香蕉［甘蕉］", cat: "fruit", srcCat: "水果类及其制品-热带亚热带水果", code: "065033", kcal: 93, pro: 1.4, fat: 0.2, cho: 22, fib: 1.2, fibEst: false, na: 0.8, chol: 0, k: 256, gi: 52, giEst: false, giSrc: "GI 表：香蕉 52", unitG: 100, unitName: "1 根（100 g 可食部）", tags: ["potassium"], exch100: 1.03},
+  {id: "F081", name: "芒果［抹猛果，望果］", cat: "fruit", srcCat: "水果类及其制品-热带亚热带水果", code: "065011", kcal: 35, pro: 0.6, fat: 0.2, cho: 8.3, fib: 1.3, fibEst: false, na: 2.8, chol: 0, k: 138, gi: 55, giEst: false, giSrc: "GI 表：芒果 55", unitG: null, unitName: null, tags: ["tropical"], exch100: 0.39},
+  {id: "F082", name: "菠萝［凤梨，地菠萝］", cat: "fruit", srcCat: "水果类及其制品-热带亚热带水果", code: "065002", kcal: 44, pro: 0.5, fat: 0.1, cho: 10.8, fib: 1.3, fibEst: false, na: 0.8, chol: 0, k: 113, gi: 66, giEst: false, giSrc: "GI 表：菠萝 66", unitG: null, unitName: null, tags: ["highGI", "tropical"], exch100: 0.49},
+  {id: "F083", name: "火龙果［仙蜜果、红龙果］", cat: "fruit", srcCat: "水果类及其制品-热带亚热带水果", code: "065023", kcal: 55, pro: 1.1, fat: 0.2, cho: 13.3, fib: 1.6, fibEst: false, na: 2.7, chol: 0, k: 20, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["tropical"], exch100: 0.61},
+  {id: "F084", name: "猪肉（代表值，fat30g）", cat: "meat", srcCat: "畜肉类及其制品-猪", code: "081101x", kcal: 331, pro: 15.1, fat: 30.1, cho: 0, fib: 0, fibEst: false, na: 56.8, chol: 86, k: 218, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fatty", "purineMod"], exch100: 3.68},
+  {id: "F085", name: "猪里脊（熏烤小里脊）", cat: "meat", srcCat: "畜肉类及其制品-猪", code: "081324", kcal: 153, pro: 17.7, fat: 3.9, cho: 11.8, fib: 0, fibEst: false, na: 814.2, chol: 94, k: 718, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["lean", "processed", "naHigh"], exch100: 1.7},
+  {id: "F086", name: "牛肉（代表值，fat9g）", cat: "meat", srcCat: "畜肉类及其制品-牛", code: "082101x", kcal: 160, pro: 20, fat: 8.7, cho: 0.5, fib: 0, fibEst: false, na: 64.1, chol: 58, k: 212, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["purineMod"], exch100: 1.78},
+  {id: "F087", name: "牛肉（里脊肉）［牛柳］", cat: "meat", srcCat: "畜肉类及其制品-牛", code: "082105", kcal: 107, pro: 22.2, fat: 0.9, cho: 2.4, fib: 0, fibEst: false, na: 75.1, chol: 63, k: 140, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["lean"], exch100: 1.19},
+  {id: "F088", name: "牛肉（后腿）", cat: "meat", srcCat: "畜肉类及其制品-牛", code: "082103", kcal: 106, pro: 20.9, fat: 2, cho: 1.1, fib: 0, fibEst: false, na: 45.4, chol: 74, k: 197, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["lean"], exch100: 1.18},
+  {id: "F089", name: "羊肉（里脊）", cat: "meat", srcCat: "畜肉类及其制品-羊", code: "083105", kcal: 103, pro: 20.5, fat: 1.6, cho: 1.6, fib: 0, fibEst: false, na: 74.4, chol: 107, k: 161, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["lean"], exch100: 1.14},
+  {id: "F090", name: "鸡胸脯肉", cat: "meat", srcCat: "禽肉类及其制品-鸡", code: "091112", kcal: 118, pro: 24.6, fat: 1.9, cho: 0.6, fib: 0, fibEst: false, na: 44.8, chol: 65, k: 333, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["lean", "whiteMeat"], exch100: 1.31},
+  {id: "F091", name: "鸡腿", cat: "meat", srcCat: "禽肉类及其制品-鸡", code: "091113", kcal: 146, pro: 20.2, fat: 7.2, cho: 0, fib: 0, fibEst: false, na: 73.6, chol: 99, k: 221, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["whiteMeat"], exch100: 1.62},
+  {id: "F092", name: "鸡翅", cat: "meat", srcCat: "禽肉类及其制品-鸡", code: "091114", kcal: 202, pro: 19, fat: 11.5, cho: 5.5, fib: 0, fibEst: false, na: 50.8, chol: 81, k: 205, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fatty", "whiteMeat"], exch100: 2.24},
+  {id: "F093", name: "鸭（代表值）", cat: "meat", srcCat: "禽肉类及其制品-鸭", code: "092101x", kcal: 240, pro: 15.5, fat: 19.7, cho: 0.2, fib: 0, fibEst: false, na: 69, chol: 94, k: 191, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fatty"], exch100: 2.67},
+  {id: "F094", name: "猪肝", cat: "meat", srcCat: "畜肉类及其制品-猪", code: "081214", kcal: 126, pro: 19.2, fat: 4.7, cho: 1.8, fib: 0, fibEst: false, na: 68.6, chol: 180, k: 235, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["organ", "purineHigh", "cholHigh"], exch100: 1.4},
+  {id: "F095", name: "鸡蛋（代表值）", cat: "meat", srcCat: "蛋类及其制品-鸡蛋", code: "111101x", kcal: 139, pro: 13.1, fat: 8.6, cho: 2.4, fib: 0, fibEst: false, na: 131.5, chol: 648, k: 154, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: 50, unitName: "1 个（50 g）", tags: ["egg"], exch100: 1.54},
+  {id: "F096", name: "鸡蛋白", cat: "meat", srcCat: "蛋类及其制品-鸡蛋", code: "111105", kcal: 60, pro: 11.6, fat: 0.1, cho: 3.1, fib: 0, fibEst: false, na: 79.4, chol: null, k: 132, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: 33, unitName: "1 个蛋白（33 g）", tags: ["egg", "lean"], exch100: 0.67},
+  {id: "F097", name: "鸡蛋黄", cat: "meat", srcCat: "蛋类及其制品-鸡蛋", code: "111107", kcal: 328, pro: 15.2, fat: 28.2, cho: 3.4, fib: 0, fibEst: false, na: 54.9, chol: 1510, k: 95, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: 17, unitName: "1 个蛋黄（17 g）", tags: ["egg", "cholHigh"], exch100: 3.64},
+  {id: "F098", name: "草鱼", cat: "meat", srcCat: "鱼虾蟹贝类-鱼", code: "121102", kcal: 113, pro: 16.6, fat: 5.2, cho: 0, fib: 0, fibEst: false, na: 46, chol: 86, k: 312, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fish", "lean"], exch100: 1.26},
+  {id: "F099", name: "鲫鱼［喜头鱼、海附鱼］", cat: "meat", srcCat: "鱼虾蟹贝类-鱼", code: "121123", kcal: 108, pro: 17.1, fat: 2.7, cho: 3.8, fib: 0, fibEst: false, na: 41.2, chol: 130, k: 290, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fish", "lean"], exch100: 1.2},
+  {id: "F100", name: "带鱼［白带鱼、刀鱼］", cat: "meat", srcCat: "鱼虾蟹贝类-鱼", code: "121203", kcal: 127, pro: 17.7, fat: 4.9, cho: 3.1, fib: 0, fibEst: false, na: 150.1, chol: 76, k: 280, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fish"], exch100: 1.41},
+  {id: "F101", name: "鲈鱼［鲈花］", cat: "meat", srcCat: "鱼虾蟹贝类-鱼", code: "121226", kcal: 105, pro: 18.6, fat: 3.4, cho: 0, fib: 0, fibEst: false, na: 144.1, chol: 86, k: 205, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fish", "lean"], exch100: 1.17},
+  {id: "F102", name: "鲑鱼［大马哈鱼、三文鱼］", cat: "meat", srcCat: "鱼虾蟹贝类-鱼", code: "121228", kcal: 139, pro: 17.2, fat: 7.8, cho: 0, fib: 0, fibEst: false, na: 63.3, chol: 68, k: 361, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fish", "omega3"], exch100: 1.54},
+  {id: "F103", name: "鳕鱼［鳕狭、明太鱼］", cat: "meat", srcCat: "鱼虾蟹贝类-鱼", code: "121239", kcal: 88, pro: 20.4, fat: 0.5, cho: 0.5, fib: 0, fibEst: false, na: 130.3, chol: 114, k: 321, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["fish", "lean"], exch100: 0.98},
+  {id: "F104", name: "斑节对虾［草虾］", cat: "meat", srcCat: "鱼虾蟹贝类-虾", code: "122102", kcal: 103, pro: 18.6, fat: 0.8, cho: 5.4, fib: 0, fibEst: false, na: 168.8, chol: 148, k: 363, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["shrimp", "lean"], exch100: 1.14},
+  {id: "F105", name: "长毛对虾［大虾、白露虾］", cat: "meat", srcCat: "鱼虾蟹贝类-虾", code: "122103", kcal: 90, pro: 18.5, fat: 0.4, cho: 3, fib: 0, fibEst: false, na: 208.8, chol: 136, k: 386, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["shrimp", "lean"], exch100: 1},
+  {id: "F106", name: "海参（水浸）", cat: "meat", srcCat: "鱼虾蟹贝类-其他", code: "129003", kcal: 25, pro: 6, fat: 0.1, cho: 0, fib: 0, fibEst: false, na: 80.9, chol: 50, k: 41, gi: null, giEst: false, giSrc: "GI 表未收录（几乎不含碳水）", unitG: null, unitName: null, tags: ["lean", "naHigh"], exch100: 0.28},
+  {id: "F107", name: "黄豆［大豆］", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031101", kcal: 390, pro: 35, fat: 16, cho: 34.2, fib: 15.5, fibEst: false, na: 2.2, chol: 0, k: 1503, gi: 18, giEst: false, giSrc: "GI 表：黄豆（浸泡）18", unitG: null, unitName: null, tags: ["plantProtein", "legume", "purineMod"], exch100: 4.33},
+  {id: "F108", name: "豆浆", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031405", kcal: 31, pro: 3, fat: 1.6, cho: 1.2, fib: 0.2, fibEst: true, na: 3.7, chol: 0, k: 117, gi: 19, giEst: false, giSrc: "GI 表：豆奶 19（近似）", unitG: 250, unitName: "1 杯（250 ml）", tags: ["plantProtein", "drink"], exch100: 0.34},
+  {id: "F109", name: "豆腐（代表值）", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031301x", kcal: 84, pro: 6.6, fat: 5.3, cho: 3.4, fib: 0.4, fibEst: true, na: 5.6, chol: 0, k: 118, gi: 32, giEst: false, giSrc: "GI 表：豆腐（炖）32", unitG: null, unitName: null, tags: ["plantProtein", "ckdCaution"], exch100: 0.93},
+  {id: "F110", name: "豆腐（北豆腐）", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031306", kcal: 116, pro: 9.2, fat: 8.1, cho: 3, fib: 0.4, fibEst: true, na: 7.3, chol: 0, k: 106, gi: 32, giEst: false, giSrc: "GI 表：豆腐（炖）32", unitG: null, unitName: null, tags: ["plantProtein", "ckdCaution"], exch100: 1.29},
+  {id: "F111", name: "豆腐（南豆腐）", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031307", kcal: 87, pro: 5.7, fat: 5.8, cho: 3.9, fib: 0.4, fibEst: true, na: 3.1, chol: 0, k: 154, gi: 32, giEst: false, giSrc: "GI 表：豆腐（炖）32", unitG: null, unitName: null, tags: ["plantProtein", "ckdCaution"], exch100: 0.97},
+  {id: "F112", name: "豆腐（内酯）", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031304", kcal: 50, pro: 5, fat: 1.9, cho: 3.3, fib: 0.4, fibEst: false, na: 6.4, chol: 0, k: 95, gi: 32, giEst: false, giSrc: "GI 表：豆腐（炖）32", unitG: null, unitName: null, tags: ["plantProtein", "ckdCaution"], exch100: 0.56},
+  {id: "F113", name: "豆腐干（代表值）", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031510x", kcal: 197, pro: 14.9, fat: 11.3, cho: 9.6, fib: 0.8, fibEst: true, na: 329, chol: 0, k: 137, gi: 24, giEst: false, giSrc: "GI 表：豆腐干 24", unitG: null, unitName: null, tags: ["plantProtein", "naHigh", "ckdCaution"], exch100: 2.19},
+  {id: "F114", name: "千张［百页］", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031509", kcal: 262, pro: 24.5, fat: 16, cho: 5.5, fib: 1, fibEst: false, na: 20.6, chol: 0, k: 94, gi: 24, giEst: false, giSrc: "GI 表：豆腐干 24（近似）", unitG: null, unitName: null, tags: ["plantProtein", "ckdCaution"], exch100: 2.91},
+  {id: "F115", name: "腐竹", cat: "soy", srcCat: "干豆类及其制品-大豆", code: "031507", kcal: 461, pro: 44.6, fat: 21.7, cho: 22.3, fib: 1, fibEst: false, na: 26.5, chol: 0, k: 553, gi: 24, giEst: false, giSrc: "GI 表：豆腐干 24（近似）", unitG: null, unitName: null, tags: ["plantProtein", "dry", "ckdCaution"], exch100: 5.12},
+  {id: "F116", name: "绿豆（干）", cat: "soy", srcCat: "干豆类及其制品-绿豆", code: "032101", kcal: 329, pro: 21.6, fat: 0.8, cho: 62, fib: 6.4, fibEst: false, na: 3.2, chol: 0, k: 787, gi: 27, giEst: false, giSrc: "GI 表：绿豆 27", unitG: null, unitName: null, tags: ["legume", "wholeGrain", "purineMod"], exch100: 3.66},
+  {id: "F117", name: "赤小豆（干）［小豆，红小豆］", cat: "soy", srcCat: "干豆类及其制品-赤豆", code: "033101", kcal: 324, pro: 20.2, fat: 0.6, cho: 63.4, fib: 7.7, fibEst: false, na: 2.2, chol: 0, k: 860, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["legume", "wholeGrain"], exch100: 3.6},
+  {id: "F118", name: "豌豆（干）", cat: "soy", srcCat: "干豆类及其制品-其他", code: "039301", kcal: 334, pro: 20.3, fat: 1.1, cho: 65.8, fib: 10.4, fibEst: false, na: 9.7, chol: 0, k: 823, gi: 42, giEst: false, giSrc: "GI 表：豌豆 42", unitG: null, unitName: null, tags: ["legume", "wholeGrain"], exch100: 3.71},
+  {id: "F119", name: "四季豆（菜豆）", cat: "soy", srcCat: "蔬菜类及其制品-鲜豆类", code: "042110", kcal: 31, pro: 2, fat: 0.4, cho: 5.7, fib: 1.5, fibEst: false, na: 8.6, chol: 0, k: 123, gi: 27, giEst: false, giSrc: "GI 表：四季豆 27", unitG: null, unitName: null, tags: ["legumeVeg"], exch100: 0.34},
+  {id: "F120", name: "鹰嘴豆［桃豆］", cat: "soy", srcCat: "干豆类及其制品-其他", code: "039401", kcal: 340, pro: 21.2, fat: 4.2, cho: 60.1, fib: 11.6, fibEst: false, na: 6, chol: 0, k: 830, gi: 33, giEst: false, giSrc: "GI 表：鹰嘴豆 33", unitG: null, unitName: null, tags: ["legume", "wholeGrain", "lowGI"], exch100: 3.78},
+  {id: "F121", name: "纯牛奶（代表值，全脂）", cat: "dairy", srcCat: "乳类及其制品-液态乳", code: "101101x", kcal: 65, pro: 3.3, fat: 3.6, cho: 4.9, fib: 0, fibEst: false, na: 63.7, chol: 17, k: 180, gi: 27, giEst: false, giSrc: "GI 表：全脂牛奶 27", unitG: 250, unitName: "1 盒（250 ml）", tags: ["dairy", "calcium"], exch100: 0.72},
+  {id: "F122", name: "纯牛奶（代表值，脱脂）", cat: "dairy", srcCat: "乳类及其制品-液态乳", code: "101161x", kcal: 34, pro: 3.5, fat: 0.3, cho: 4.6, fib: 0, fibEst: false, na: 127.3, chol: 4, k: 200, gi: 32, giEst: false, giSrc: "GI 表：脱脂牛奶 32", unitG: 250, unitName: "1 盒（250 ml）", tags: ["dairy", "calcium", "lowFat"], exch100: 0.38},
+  {id: "F123", name: "酸奶", cat: "dairy", srcCat: "乳类及其制品-酸奶", code: "103001", kcal: 70, pro: 3.2, fat: 1.9, cho: 10, fib: 0, fibEst: false, na: 32.5, chol: 15, k: 135, gi: 36, giEst: true, giSrc: "GI 表：酸乳酪（普通）36（近似，注意选无糖）", unitG: 100, unitName: "1 杯（100 g）", tags: ["dairy", "probiotic", "calcium"], exch100: 0.78},
+  {id: "F124", name: "全脂奶粉（代表值）", cat: "dairy", srcCat: "乳类及其制品-奶粉", code: "102101x", kcal: 482, pro: 19.9, fat: 22.3, cho: 50.5, fib: 0, fibEst: false, na: 352, chol: 79, k: 777, gi: 11.9, giEst: true, giSrc: "GI 表：低脂奶粉 11.9（近似）", unitG: 25, unitName: "1 平勺（25 g）", tags: ["dairy", "dry", "calcium"], exch100: 5.36},
+  {id: "F125", name: "奶酪［干酪］", cat: "dairy", srcCat: "乳类及其制品-奶酪", code: "104001", kcal: 328, pro: 25.7, fat: 23.5, cho: 3.5, fib: 0, fibEst: false, na: 584.6, chol: 11, k: 75, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["dairy", "naHigh", "calcium"], exch100: 3.64},
+  {id: "F126", name: "花生仁（生）", cat: "nut", srcCat: "坚果种子类-种子", code: "072004", kcal: 574, pro: 24.8, fat: 44.3, cho: 21.7, fib: 5.5, fibEst: false, na: 3.6, chol: 0, k: 587, gi: 14, giEst: false, giSrc: "GI 表：花生 14", unitG: null, unitName: null, tags: ["nut", "plantProtein"], exch100: 6.38},
+  {id: "F127", name: "核桃（干）［胡桃］", cat: "nut", srcCat: "坚果种子类-树坚果", code: "071004", kcal: 646, pro: 14.9, fat: 58.8, cho: 19.1, fib: 9.5, fibEst: false, na: 6.4, chol: 0, k: 385, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["nut", "omega3"], exch100: 7.18},
+  {id: "F128", name: "杏仁（原味）", cat: "nut", srcCat: "坚果种子类-树坚果", code: "071017", kcal: 596, pro: 21.3, fat: 50.6, cho: 19.7, fib: 11.8, fibEst: false, na: 1, chol: 0, k: 728, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["nut"], exch100: 6.62},
+  {id: "F129", name: "腰果（熟）", cat: "nut", srcCat: "坚果种子类-树坚果", code: "071036", kcal: 615, pro: 24, fat: 50.9, cho: 20.4, fib: 10.4, fibEst: false, na: 35.7, chol: 0, k: 680, gi: 25, giEst: false, giSrc: "GI 表：腰果 25", unitG: null, unitName: null, tags: ["nut"], exch100: 6.83},
+  {id: "F130", name: "芝麻子（黑）", cat: "nut", srcCat: "坚果种子类-种子", code: "072017", kcal: 559, pro: 19.1, fat: 46.1, cho: 24, fib: 14, fibEst: false, na: 8.3, chol: 0, k: 358, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["nut", "calcium"], exch100: 6.21},
+  {id: "F131", name: "南瓜子（炒）［白瓜子］", cat: "nut", srcCat: "坚果种子类-种子", code: "072011", kcal: 582, pro: 36, fat: 46.1, cho: 7.9, fib: 4.1, fibEst: false, na: 15.8, chol: 0, k: 672, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["nut"], exch100: 6.47},
+  {id: "F132", name: "西瓜子（炒）", cat: "nut", srcCat: "坚果种子类-种子", code: "072013", kcal: 582, pro: 32.7, fat: 44.8, cho: 14.2, fib: 4.5, fibEst: false, na: 187.7, chol: 0, k: 612, gi: null, giEst: false, giSrc: "GI 表未收录", unitG: null, unitName: null, tags: ["nut", "naHigh"], exch100: 6.47},
+  {id: "F133", name: "花生油", cat: "oil", srcCat: "植物油-植物油", code: "192007", kcal: 899, pro: 0, fat: 99.9, cho: 0, fib: 0, fibEst: false, na: 3.5, chol: null, k: 1, gi: null, giEst: false, giSrc: "不含碳水，不计 GL", unitG: 10, unitName: "1 瓷勺（10 g）", tags: ["oil"], exch100: 9.99},
+  {id: "F134", name: "橄榄油", cat: "oil", srcCat: "植物油-植物油", code: "192019", kcal: 899, pro: 0, fat: 99.9, cho: 0, fib: 0, fibEst: false, na: null, chol: 0, k: null, gi: null, giEst: false, giSrc: "不含碳水，不计 GL", unitG: 10, unitName: "1 瓷勺（10 g）", tags: ["oil", "monoUnsaturated"], exch100: 9.99},
+  {id: "F135", name: "玉米油", cat: "oil", srcCat: "植物油-植物油", code: "192016", kcal: 895, pro: 0, fat: 99.2, cho: 0.5, fib: 0, fibEst: false, na: 1.4, chol: null, k: 2, gi: null, giEst: false, giSrc: "不含碳水，不计 GL", unitG: 10, unitName: "1 瓷勺（10 g）", tags: ["oil"], exch100: 9.94},
+  {id: "F136", name: "芝麻油［香油］", cat: "oil", srcCat: "植物油-植物油", code: "192017", kcal: 898, pro: 0, fat: 99.7, cho: 0.2, fib: 0, fibEst: false, na: 1.1, chol: null, k: null, gi: null, giEst: false, giSrc: "不含碳水，不计 GL", unitG: 10, unitName: "1 瓷勺（10 g）", tags: ["oil"], exch100: 9.98},
+  {id: "F137", name: "猪油（炼）", cat: "oil", srcCat: "动物油脂类-动物油脂", code: "191007", kcal: 897, pro: 0, fat: 99.6, cho: 0.2, fib: 0, fibEst: false, na: null, chol: 93, k: null, gi: null, giEst: false, giSrc: "不含碳水，不计 GL", unitG: 10, unitName: "1 瓷勺（10 g）", tags: ["oil", "saturated"], exch100: 9.97},
+];
+window.CAT_META = {
+ "grain": {
+  "label": "谷薯类（主食）",
+  "role": "提供碳水与膳食纤维，优先全谷杂豆与低 GI 品种"
+ },
+ "veg": {
+  "label": "蔬菜类",
+  "role": "餐餐有蔬菜，深色蔬菜占一半以上，餐前先吃菜"
+ },
+ "fruit": {
+  "label": "水果类",
+  "role": "放在两餐之间或运动前后，血糖平稳时吃"
+ },
+ "meat": {
+  "label": "肉蛋鱼虾类",
+  "role": "优选鱼虾、禽肉、蛋，限制加工肉与肥肉"
+ },
+ "soy": {
+  "label": "豆类及制品",
+  "role": "优质植物蛋白，与动物蛋白搭配"
+ },
+ "dairy": {
+  "label": "乳类",
+  "role": "每日 300 ml 液态奶或等量乳制品"
+ },
+ "nut": {
+  "label": "坚果种子",
+  "role": "每日 10 g 左右，计入总能量与油脂"
+ },
+ "oil": {
+  "label": "油脂类",
+  "role": "每日烹调油 25～30 g，相当于 2～3 交换份"
+ }
+};
+window.GI_REFERENCE = [
+  {g: "糖类", n: "葡萄糖", gi: 100},
+  {g: "糖类", n: "绵白糖", gi: 84},
+  {g: "糖类", n: "蔗糖", gi: 65},
+  {g: "糖类", n: "果糖", gi: 23},
+  {g: "糖类", n: "乳糖", gi: 46},
+  {g: "糖类", n: "麦芽糖", gi: 105},
+  {g: "糖类", n: "蜂蜜", gi: 73},
+  {g: "糖类", n: "胶质软糖", gi: 80},
+  {g: "糖类", n: "巧克力", gi: 49},
+  {g: "糖类", n: "MM 巧克力", gi: 32},
+  {g: "糖类", n: "方糖", gi: 65},
+  {g: "谷类及制品", n: "* 小麦（整粒煮）", gi: 41},
+  {g: "谷类及制品", n: "* 粗麦粉（蒸）", gi: 65},
+  {g: "谷类及制品", n: "* 面条（强化蛋白质，细煮）", gi: 27},
+  {g: "谷类及制品", n: "* 面条（全麦粉，细）", gi: 37},
+  {g: "谷类及制品", n: "* 面条（白细，煮）", gi: 41},
+  {g: "谷类及制品", n: "* 面条（硬质小麦粉，细煮）", gi: 55},
+  {g: "谷类及制品", n: "* 线面条（实心，细）", gi: 35},
+  {g: "谷类及制品", n: "* 通心面（管状，粗）", gi: 45},
+  {g: "谷类及制品", n: "面条（小麦粉，硬，扁粗）", gi: 46},
+  {g: "谷类及制品", n: "面条（硬质小麦粉，加鸡蛋，粗）", gi: 49},
+  {g: "谷类及制品", n: "面条（硬质小麦粉，细）", gi: 55},
+  {g: "谷类及制品", n: "面条（挂面，全麦粉）", gi: 57},
+  {g: "谷类及制品", n: "苗条（挂面，精制小麦粉）", gi: 55},
+  {g: "谷类及制品", n: "馒头（全麦粉）", gi: 82},
+  {g: "谷类及制品", n: "馒头（精制小麦粉）", gi: 85},
+  {g: "谷类及制品", n: "馒头（富强粉）", gi: 88},
+  {g: "谷类及制品", n: "烙饼", gi: 80},
+  {g: "谷类及制品", n: "油条", gi: 75},
+  {g: "谷类及制品", n: "稻麸", gi: 19},
+  {g: "谷类及制品", n: "* 米粉", gi: 54},
+  {g: "谷类及制品", n: "大米粥", gi: 69},
+  {g: "谷类及制品", n: "大米饭（籼米，糙米）", gi: 71},
+  {g: "谷类及制品", n: "大米饭（粳米，糙米）", gi: 78},
+  {g: "谷类及制品", n: "大米饭（籼米，精米）", gi: 82},
+  {g: "谷类及制品", n: "大米饭（粳米，精米）", gi: 90},
+  {g: "谷类及制品", n: "* 黏米饭 / 含直链淀粉高，煮", gi: 50},
+  {g: "谷类及制品", n: "* 黏米饭 / 含直链淀粉低，煮", gi: 88},
+  {g: "谷类及制品", n: "黑米饭", gi: 55},
+  {g: "谷类及制品", n: "速冻米饭", gi: 87},
+  {g: "谷类及制品", n: "糯米饭", gi: 87},
+  {g: "谷类及制品", n: "大米糯米粥", gi: 65},
+  {g: "谷类及制品", n: "黑米粥", gi: 42},
+  {g: "谷类及制品", n: "大麦（整粒，煮）", gi: 25},
+  {g: "谷类及制品", n: "大麦粉", gi: 66},
+  {g: "谷类及制品", n: "黑麦（整粒，煮）", gi: 34},
+  {g: "谷类及制品", n: "玉米（甜，煮）", gi: 55},
+  {g: "谷类及制品", n: "玉米面（粗粉，煮）", gi: 68},
+  {g: "谷类及制品", n: "玉米面粥", gi: 50},
+  {g: "谷类及制品", n: "玉米糁粥", gi: 51},
+  {g: "谷类及制品", n: "玉米饼", gi: 46},
+  {g: "谷类及制品", n: "玉米片（市售）", gi: 79},
+  {g: "谷类及制品", n: "玉米片（高纤维，市售）", gi: 74},
+  {g: "谷类及制品", n: "小米（煮）", gi: 71},
+  {g: "谷类及制品", n: "小米粥", gi: 60},
+  {g: "谷类及制品", n: "米饼", gi: 82},
+  {g: "谷类及制品", n: "荞麦（黄）", gi: 54},
+  {g: "谷类及制品", n: "荞麦面条", gi: 59},
+  {g: "谷类及制品", n: "荞麦面馒头", gi: 67},
+  {g: "谷类及制品", n: "燕麦麸", gi: 55},
+  {g: "谷类及制品", n: "莜麦饭（整粒）", gi: 49},
+  {g: "谷类及制品", n: "糜子饭（整粒）", gi: 72},
+  {g: "谷类及制品", n: "燕麦饭（整粒）", gi: 42},
+  {g: "谷类及制品", n: "* 燕麦片粥", gi: 55},
+  {g: "谷类及制品", n: "* 即食燕麦粥", gi: 79},
+  {g: "谷类及制品", n: "白面包", gi: 75},
+  {g: "谷类及制品", n: "全麦（全麦面包）", gi: 74},
+  {g: "谷类及制品", n: "面包（未发酵小麦）", gi: 70},
+  {g: "谷类及制品", n: "印度卷饼", gi: 62},
+  {g: "谷类及制品", n: "薄煎饼（美式）", gi: 52},
+  {g: "谷类及制品", n: "意大利面（精制面粉）", gi: 49},
+  {g: "谷类及制品", n: "意大利面（全麦）", gi: 48},
+  {g: "谷类及制品", n: "乌冬面", gi: 55},
+  {g: "谷类及制品", n: "饼干（小麦片）", gi: 69},
+  {g: "薯类、淀粉及制品", n: "马铃薯", gi: 62},
+  {g: "薯类、淀粉及制品", n: "马铃薯（蒸）", gi: 66},
+  {g: "薯类、淀粉及制品", n: "* 马铃薯（烤）", gi: 60},
+  {g: "薯类、淀粉及制品", n: "* 马铃薯（蒸）", gi: 65},
+  {g: "薯类、淀粉及制品", n: "* 马铃薯（用微波炉烤）", gi: 82},
+  {g: "薯类、淀粉及制品", n: "* 马铃薯（烧烤，无油脂）", gi: 85},
+  {g: "薯类、淀粉及制品", n: "* 马铃薯泥", gi: 87},
+  {g: "薯类、淀粉及制品", n: "马铃薯粉条", gi: 13.6},
+  {g: "薯类、淀粉及制品", n: "马铃薯片（油炸）", gi: 60},
+  {g: "薯类、淀粉及制品", n: "炸薯条", gi: 60},
+  {g: "薯类、淀粉及制品", n: "甘薯（山芋）", gi: 54},
+  {g: "薯类、淀粉及制品", n: "甘薯（红，煮）", gi: 77},
+  {g: "薯类、淀粉及制品", n: "藕粉", gi: 33},
+  {g: "薯类、淀粉及制品", n: "苕粉", gi: 35},
+  {g: "薯类、淀粉及制品", n: "粉丝汤（豌豆）", gi: 32},
+  {g: "豆类及制品", n: "黄豆（浸泡）", gi: 18},
+  {g: "豆类及制品", n: "黄豆（罐头）", gi: 14},
+  {g: "豆类及制品", n: "黄豆挂面（有面粉）", gi: 67},
+  {g: "豆类及制品", n: "豆腐（炖）", gi: 32},
+  {g: "豆类及制品", n: "豆腐（冻）", gi: 22},
+  {g: "豆类及制品", n: "豆腐干", gi: 24},
+  {g: "豆类及制品", n: "绿豆", gi: 27},
+  {g: "豆类及制品", n: "绿豆挂面", gi: 33},
+  {g: "豆类及制品", n: "蚕豆（五香）", gi: 17},
+  {g: "豆类及制品", n: "扁豆", gi: 38},
+  {g: "豆类及制品", n: "扁豆（红，小）", gi: 26},
+  {g: "豆类及制品", n: "扁豆（绿，小）", gi: 30},
+  {g: "豆类及制品", n: "* 扁豆（绿，小，罐头）", gi: 52},
+  {g: "豆类及制品", n: "* 小扁豆汤（罐头）", gi: 44},
+  {g: "豆类及制品", n: "* 利马豆（棉豆）", gi: 31},
+  {g: "豆类及制品", n: "* 利马豆（加 5 克蔗糖）", gi: 30},
+  {g: "豆类及制品", n: "* 利马豆（加 10 克蔗糖）", gi: 31},
+  {g: "豆类及制品", n: "* 利马豆（嫩，冷冻）", gi: 32},
+  {g: "豆类及制品", n: "鹰嘴豆", gi: 33},
+  {g: "豆类及制品", n: "* 鹰嘴豆（罐头）", gi: 42},
+  {g: "豆类及制品", n: "* 咖喱鹰嘴豆（罐头）", gi: 41},
+  {g: "豆类及制品", n: "* 青刀豆", gi: 39},
+  {g: "豆类及制品", n: "青刀豆（罐头）", gi: 45},
+  {g: "豆类及制品", n: "* 豌豆", gi: 42},
+  {g: "豆类及制品", n: "黑马诺豆", gi: 46},
+  {g: "豆类及制品", n: "黑豆汤", gi: 46},
+  {g: "豆类及制品", n: "四季豆", gi: 27},
+  {g: "豆类及制品", n: "四季豆（高压处理）", gi: 34},
+  {g: "豆类及制品", n: "* 四季豆（罐头）", gi: 52},
+  {g: "豆类及制品", n: "* 芸豆", gi: 24},
+  {g: "蔬菜类", n: "* 甜菜", gi: 64},
+  {g: "蔬菜类", n: "胡萝卜（金笋）", gi: 71},
+  {g: "蔬菜类", n: "南瓜（倭瓜、番瓜）", gi: 75},
+  {g: "蔬菜类", n: "麝香瓜", gi: 65},
+  {g: "蔬菜类", n: "山药（薯蓣）", gi: 51},
+  {g: "蔬菜类", n: "雪魔芋", gi: 17},
+  {g: "蔬菜类", n: "芋头（蒸芋艿 / 毛芋）", gi: 48},
+  {g: "蔬菜类", n: "朝鲜笋", gi: 15},
+  {g: "蔬菜类", n: "芦笋", gi: 15},
+  {g: "蔬菜类", n: "绿菜花", gi: 15},
+  {g: "蔬菜类", n: "菜花", gi: 15},
+  {g: "蔬菜类", n: "芹菜", gi: 15},
+  {g: "蔬菜类", n: "黄瓜", gi: 15},
+  {g: "蔬菜类", n: "茄子", gi: 15},
+  {g: "蔬菜类", n: "鲜青豆", gi: 15},
+  {g: "蔬菜类", n: "莴笋（各种类型）", gi: 15},
+  {g: "蔬菜类", n: "生菜", gi: 15},
+  {g: "蔬菜类", n: "青椒", gi: 15},
+  {g: "蔬菜类", n: "西红柿", gi: 15},
+  {g: "蔬菜类", n: "菠菜", gi: 15},
+  {g: "蔬菜类", n: "* 胡萝卜（煮）", gi: 39},
+  {g: "水果类及制品", n: "苹果", gi: 36},
+  {g: "水果类及制品", n: "梨", gi: 36},
+  {g: "水果类及制品", n: "桃", gi: 28},
+  {g: "水果类及制品", n: "桃（罐头，含果汁）", gi: 30},
+  {g: "水果类及制品", n: "桃（罐头，含糖浓度低）", gi: 52},
+  {g: "水果类及制品", n: "桃（罐头，含糖浓度高）", gi: 58},
+  {g: "水果类及制品", n: "杏干", gi: 31},
+  {g: "水果类及制品", n: "杏罐头，含淡味果汁", gi: 64},
+  {g: "水果类及制品", n: "李子", gi: 24},
+  {g: "水果类及制品", n: "樱桃", gi: 22},
+  {g: "水果类及制品", n: "葡萄", gi: 43},
+  {g: "水果类及制品", n: "葡萄干", gi: 64},
+  {g: "水果类及制品", n: "葡萄（淡黄色，小，无核）", gi: 56},
+  {g: "水果类及制品", n: "猕猴桃", gi: 52},
+  {g: "水果类及制品", n: "柑（橘子）", gi: 43},
+  {g: "水果类及制品", n: "柚", gi: 25},
+  {g: "水果类及制品", n: "巴婆果", gi: 58},
+  {g: "水果类及制品", n: "菠萝", gi: 66},
+  {g: "水果类及制品", n: "芒果", gi: 55},
+  {g: "水果类及制品", n: "芭蕉（甘蔗板蕉）", gi: 53},
+  {g: "水果类及制品", n: "香蕉", gi: 52},
+  {g: "水果类及制品", n: "香蕉（生）", gi: 30},
+  {g: "水果类及制品", n: "西瓜", gi: 72},
+  {g: "水果类及制品", n: "哈密瓜", gi: 70},
+  {g: "水果类及制品", n: "枣", gi: 42},
+  {g: "水果类及制品", n: "* 草莓酱（果冻）", gi: 49},
+  {g: "种子类", n: "花生", gi: 14},
+  {g: "种子类", n: "腰果", gi: 25},
+  {g: "乳及乳制品", n: "牛奶", gi: 27.6},
+  {g: "乳及乳制品", n: "牛奶（加糖和巧克力）", gi: 34},
+  {g: "乳及乳制品", n: "牛奶（加人工甜味剂和巧克力）", gi: 24},
+  {g: "乳及乳制品", n: "全脂牛奶", gi: 27},
+  {g: "乳及乳制品", n: "脱脂牛奶", gi: 32},
+  {g: "乳及乳制品", n: "低脂奶粉", gi: 11.9},
+  {g: "乳及乳制品", n: "降糖奶粉", gi: 26},
+  {g: "乳及乳制品", n: "老年奶粉", gi: 40},
+  {g: "乳及乳制品", n: "克糖奶粉", gi: 47.6},
+  {g: "乳及乳制品", n: "酸奶（加糖）", gi: 48},
+  {g: "乳及乳制品", n: "酸乳酪（普通）", gi: 36},
+  {g: "乳及乳制品", n: "酸乳酪（低脂）", gi: 33},
+  {g: "乳及乳制品", n: "酸乳酪（低脂，加人工甜味剂）", gi: 14},
+  {g: "乳及乳制品", n: "豆奶", gi: 19},
+  {g: "乳及乳制品", n: "冰淇淋", gi: 51},
+  {g: "乳及乳制品", n: "酸奶（水果）", gi: 41},
+  {g: "乳及乳制品", n: "豆奶", gi: 34},
+  {g: "速食食品", n: "大米（即食，煮 1 分钟）", gi: 46},
+  {g: "速食食品", n: "大米（即食，煮 6 分钟）", gi: 87},
+  {g: "速食食品", n: "小麦片", gi: 69},
+  {g: "速食食品", n: "燕麦片（混合）", gi: 83},
+  {g: "速食食品", n: "荞麦方便面", gi: 53},
+  {g: "速食食品", n: "即食羹", gi: 69},
+  {g: "速食食品", n: "营养饼", gi: 66},
+  {g: "速食食品", n: "* 全麦维（家乐氏）", gi: 42},
+  {g: "速食食品", n: "* 可可米（家乐氏）", gi: 77},
+  {g: "速食食品", n: "* 卜卜米（家乐氏）", gi: 88},
+  {g: "速食食品", n: "* 比萨饼（含乳酪）", gi: 60},
+  {g: "速食食品", n: "汉堡包", gi: 61},
+  {g: "速食食品", n: "白面包", gi: 88},
+  {g: "速食食品", n: "面包（全麦粉）", gi: 69},
+  {g: "速食食品", n: "面包（粗面粉）", gi: 64},
+  {g: "速食食品", n: "面包（黑麦粉）", gi: 65},
+  {g: "速食食品", n: "面包（小麦粉，高纤维）", gi: 68},
+  {g: "速食食品", n: "面包（小麦粉，去面筋）", gi: 70},
+  {g: "速食食品", n: "* 面包（小麦粉，含水果干）", gi: 47},
+  {g: "速食食品", n: "* 面包（50% ~ 80% 碎小麦粒）", gi: 52},
+  {g: "速食食品", n: "* 面包（75% ~ 80% 大麦粒）", gi: 34},
+  {g: "速食食品", n: "* 面包（50% 大麦粒）", gi: 46},
+  {g: "速食食品", n: "* 面包（80% ~ 100% 大麦粉）", gi: 66},
+  {g: "速食食品", n: "* 面包（黑麦粒）", gi: 50},
+  {g: "速食食品", n: "* 面包（45% ~ 50% 燕麦麸）", gi: 47},
+  {g: "速食食品", n: "* 面包（80% 燕麦粒）", gi: 65},
+  {g: "速食食品", n: "* 面包（混合谷物）", gi: 45},
+  {g: "速食食品", n: "新月形面包", gi: 67},
+  {g: "速食食品", n: "棍子面包", gi: 90},
+  {g: "速食食品", n: "燕麦粗粉饼干", gi: 55},
+  {g: "速食食品", n: "油酥脆饼干", gi: 64},
+  {g: "速食食品", n: "高纤维黑麦薄脆饼干", gi: 65},
+  {g: "速食食品", n: "竹芋粉饼干", gi: 66},
+  {g: "速食食品", n: "小麦饼干", gi: 70},
+  {g: "速食食品", n: "苏打饼干", gi: 72},
+  {g: "速食食品", n: "格雷厄姆华饼干", gi: 74},
+  {g: "速食食品", n: "华夫饼干", gi: 76},
+  {g: "速食食品", n: "香草华夫饼干", gi: 77},
+  {g: "速食食品", n: "膨化薄脆饼干", gi: 81},
+  {g: "速食食品", n: "闲趣饼干（达能）", gi: 47},
+  {g: "速食食品", n: "牛奶香脆饼干（达能）", gi: 39},
+  {g: "速食食品", n: "酥皮糕点", gi: 59},
+  {g: "速食食品", n: "爆玉米花", gi: 55},
+  {g: "饮料类", n: "苹果汁", gi: 41},
+  {g: "饮料类", n: "水蜜桃汁", gi: 33},
+  {g: "饮料类", n: "巴梨汁（罐头）", gi: 44},
+  {g: "饮料类", n: "菠萝汁（不加糖）", gi: 46},
+  {g: "饮料类", n: "柚子果汁（不加糖）", gi: 48},
+  {g: "饮料类", n: "橙汁（纯果汁）", gi: 50},
+  {g: "饮料类", n: "橘子汁", gi: 57},
+  {g: "饮料类", n: "可乐饮料", gi: 40},
+  {g: "饮料类", n: "芬达软饮料", gi: 68},
+  {g: "饮料类", n: "啤酒（澳大利亚产）", gi: 66},
+  {g: "饮料类", n: "冰淇淋", gi: 61},
+  {g: "饮料类", n: "冰淇淋 / 低脂", gi: 50},
+  {g: "混合膳及其他", n: "馒头 + 芹菜炒鸡蛋", gi: 49},
+  {g: "混合膳及其他", n: "馒头 + 酱牛肉", gi: 49},
+  {g: "混合膳及其他", n: "馒头 + 黄油", gi: 68},
+  {g: "混合膳及其他", n: "饼 + 鸡蛋炒木耳", gi: 48},
+  {g: "混合膳及其他", n: "饺子 / 三鲜", gi: 28},
+  {g: "混合膳及其他", n: "包子 / 芹菜猪肉", gi: 39},
+  {g: "混合膳及其他", n: "硬质小麦粉肉馅馄饨", gi: 39},
+  {g: "混合膳及其他", n: "牛肉面", gi: 89},
+  {g: "混合膳及其他", n: "米饭 + 鱼", gi: 37},
+  {g: "混合膳及其他", n: "米饭 + 芹菜炒猪肉", gi: 57},
+  {g: "混合膳及其他", n: "米饭 + 炒蒜苗", gi: 58},
+  {g: "混合膳及其他", n: "米饭 + 蒜苗炒鸡蛋", gi: 68},
+  {g: "混合膳及其他", n: "米饭 + 红烧猪肉", gi: 73},
+  {g: "混合膳及其他", n: "玉米粉加入人造黄油 / 煮", gi: 69},
+  {g: "混合膳及其他", n: "猪肉炖粉条", gi: 17},
+  {g: "混合膳及其他", n: "西红柿汤", gi: 38},
+  {g: "混合膳及其他", n: "二合面窝头 / 玉米面 + 面粉", gi: 65},
+  {g: "混合膳及其他", n: "牛奶蛋糊 / 牛奶 + 淀粉 + 糖", gi: 43},
+  {g: "混合膳及其他", n: "黑五类粉", gi: 58},
+];
+window.KCAL_PER_EXCH = 90;
+window.DATA_VERSION = "中国食物成分表第6版整理数据 / GI 附表 259 条";
+
+/* ==== engine-prescription.js ==== */
+/* =====================================================================
+ * engine-prescription.js —— 糖尿病配餐引擎
+ *   ① 基础数据 → 理想体重 / 能量 / 三大营养素目标
+ *   ② 目标 → 食物交换份分配（每份 90 kcal）
+ *   ③ 交换份 → 具体食物与克数（含家常计量，标注生重/熟重）
+ *   ④ 营养合计、GI/GL、配餐基本要求自检
+ *   ⑤ 等量替换（按碳水 / 能量 / 蛋白质等价）
+ *
+ * 依据：中国糖尿病医学营养治疗指南（能量系数、供能比、膳食纤维）、
+ *       食物交换份法（1 交换份 = 90 kcal）、《中国食物成分表》第6版数据。
+ * ===================================================================== */
+(function (global) {
+  'use strict';
+
+  var DB = global.FOOD_DB || [];
+  var CAT_META = global.CAT_META || {};
+  var EXCH_KCAL = global.KCAL_PER_EXCH || 90;
+
+  var BY_NAME = {};
+  for (var i = 0; i < DB.length; i++) { BY_NAME[DB[i].name] = DB[i]; }
+
+  function F(name) { return BY_NAME[name] || null; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function r1(v) { return Math.round(v * 10) / 10; }
+  function r2(v) { return Math.round(v * 100) / 100; }
+  function step(v, s) { return Math.round(v / s) * s; }
+  function isDry(f) { return f.cat === 'grain' && f.kcal >= 250; }
+
+  /* ---------------------------------------------------------------- ① 处方 */
+  // 能量系数（kcal/kg 理想体重），按体型 × 活动强度，取指南常用值
+  var ENERGY_COEF = {
+    thin:   { bed: 25, light: 35, moderate: 40, heavy: 45 },
+    normal: { bed: 20, light: 30, moderate: 35, heavy: 40 },
+    over:   { bed: 15, light: 22, moderate: 30, heavy: 35 }
+  };
+
+  function bodyType(bmi) {
+    if (bmi < 18.5) return 'thin';
+    if (bmi < 24) return 'normal';
+    return 'over';           // 24～27.9 超重、≥28 肥胖，能量系数取同一档
+  }
+
+  function computePrescription(p) {
+    var warn = [];
+    var h = +p.height, w = +p.weight, age = +p.age;
+    var ibw;
+    if (p.useAdjustedWeight && p.adjustWeight) {
+      ibw = +p.adjustWeight;                       // 肥胖者可用校正体重：理想体重 + 25%×(实际-理想)
+      warn.push('已按“校正体重”计算能量系数，适用于明显肥胖者。');
+    } else {
+      ibw = h - 105;                               // Broca 改良公式
+    }
+    var bmi = w / Math.pow(h / 100, 2);
+    var bt = bodyType(bmi);
+    var coef = ENERGY_COEF[bt][p.activity] || 30;
+    var energy = ibw * coef;
+
+    if (p.type === 'gest' || p.gest === 't2tri' || p.gest === 't3tri') {
+      energy += 300; warn.push('妊娠中晚期能量 +300 kcal（按指南妊娠期增补）。');
+    } else if (p.gest === 't1tri') {
+      energy += 0;   warn.push('孕早期能量与孕前相同，不建议额外增加。');
+    } else if (p.gest === 'lact') {
+      energy += 500; warn.push('哺乳期能量 +500 kcal。');
+    }
+    if (p.goal === 'lose') { energy -= 450; warn.push('减重目标：能量 −300～500 kcal，建议每周减重 0.5～1 kg。'); }
+    if (p.goal === 'gain') { energy += 300; warn.push('增重/纠正营养不良：能量 +300 kcal。'); }
+    if (age >= 65) { energy = Math.min(energy, ibw * (coef)); warn.push('≥65 岁取能量系数下限，并保证优质蛋白 1.0～1.2 g/kg。'); }
+    if (energy < 1000) { energy = 1000; warn.push('已按最低 1000 kcal 下限校正，极低能量需在医师/营养师监督下进行。'); }
+
+    var proPerKg, proRange;
+    if (p.ckd === 'ckd45') { proPerKg = 0.8; proRange = [0.6, 0.8]; warn.push('CKD 4～5 期：蛋白质 0.8 g/kg 理想体重（0.6～0.8），需在肾科医师/营养师指导下执行。'); }
+    else if (p.ckd === 'ckd3') { proPerKg = 0.9; proRange = [0.8, 1.0]; warn.push('CKD 3 期：蛋白质 0.8～1.0 g/kg，注意优质蛋白比例 ≥50%。'); }
+    else if (p.goal === 'muscle' || p.goal === 'gain' || bt === 'thin') { proPerKg = 1.3; proRange = [1.2, 1.5]; }
+    else if (p.type === 't1' || p.type === 'gest' || p.gest === 't2tri' || p.gest === 't3tri' || p.gest === 'lact') { proPerKg = 1.2; proRange = [1.1, 1.5]; }
+    else if (p.goal === 'lose') { proPerKg = 1.2; proRange = [1.2, 1.5]; }
+    else { proPerKg = 1.05; proRange = [1.0, 1.3]; }   // 2 型糖尿病成人、肾功能正常：1.0～1.3 g/kg
+    if (age >= 65 && proPerKg < 1.2 && p.ckd === 'normal') { proPerKg = 1.2; proRange = [1.0, 1.3]; warn.push('≥65 岁：蛋白质取 1.2 g/kg 以预防肌少症，可选乳类、鱼虾、蛋、豆制品等优质蛋白。'); }
+
+    var choPct = +p.choPct || 50;               // 指南：45%～60%
+    var proRaw = ibw * proPerKg;
+    // 蛋白质按能量水平校正：不低于 15%E（高能量、消瘦、增重者需要），不高于 25%E（低能量者避免过高蛋白负荷）
+    var proMin = 0.15 * energy / 4, proMax = 0.25 * energy / 4;
+    var proG = clamp(proRaw, proMin, proMax);
+    if (proG > proRaw + 0.5) warn.push('为保证蛋白供能比 ≥15%（' + Math.round(proMin) + ' g），蛋白质由 ' + Math.round(proRaw) + ' g 上调至 ' + Math.round(proG) + ' g。');
+    if (proG < proRaw - 0.5) warn.push('能量目标较低，蛋白质按 ≤25% 供能比（' + Math.round(proMax) + ' g）校正，原 ' + Math.round(proRaw) + ' g 会使蛋白比例过高。');
+    var proPct = proG * 4 / energy * 100;
+
+    // 脂肪供能比：默认「100 − 碳水 − 蛋白」，超出 20%～30% 时优先调整碳水比例，保证三者之和为 100%
+    var fatPct = 100 - choPct - proPct;
+    if (fatPct > 30) { choPct = clamp(100 - proPct - 27, 40, 62); fatPct = 100 - choPct - proPct; }
+    if (fatPct < 20) { choPct = clamp(100 - proPct - 22, 40, 62); fatPct = 100 - choPct - proPct; }
+    if (p.fatPct != null && !isNaN(+p.fatPct) && +p.fatPct > 0) {   // 手工指定脂肪比例时以手工值为准
+      fatPct = clamp(+p.fatPct, 15, 40);
+      choPct = clamp(100 - proPct - fatPct, 30, 65);
+    }
+
+    // 供能比与指南范围核对
+    if (choPct < 45 || choPct > 60) warn.push('碳水供能比 ' + r1(choPct) + '%，超出 45%～60% 的常用范围，请确认是否有特殊理由（如极低碳水方案需医师指导）。');
+    if (proPct < 15 || proPct > 20) warn.push('蛋白供能比 ' + r1(proPct) + '%（' + Math.round(proG) + ' g，' + r1(proG / ibw) + ' g/kg 理想体重），合并肾病、消瘦、老年等需个体化。');
+    if (fatPct > 32) warn.push('脂肪供能比偏高（' + r1(fatPct) + '%），建议 ≤30%，并减少饱和脂肪与反式脂肪。');
+    if (Math.abs(choPct + proPct + fatPct - 100) > 1) {
+      warn.push('三大营养素供能比合计 ' + r1(choPct + proPct + fatPct) + '%，请核对设置。');
+    }
+
+    var choG = energy * choPct / 100 / 4;
+    var fatG = energy * fatPct / 100 / 9;
+    // 膳食纤维：中国居民膳食营养素参考摄入量（14 g/1000 kcal，约 25～30 g/d）
+    var fiberG = clamp(Math.round(energy / 1000 * 14), 15, 35);
+
+    var rx = {
+      ibw: r1(ibw), bmi: r1(bmi), bodyType: bt,
+      bodyTypeLabel: { thin: '消瘦', normal: '正常', over: '超重/肥胖' }[bt],
+      coef: coef, energy: Math.round(energy / 10) * 10,
+      choG: Math.round(choG), choPct: choPct,
+      proG: Math.round(proG), proPerKg: r2(proPerKg), proPct: r1(proPct),
+      fatG: Math.round(fatG), fatPct: fatPct,
+      proRangeG: [Math.round(Math.min(ibw * proRange[0], proG * 0.92)), Math.round(Math.max(Math.min(ibw * proRange[1], proMax), proG * 1.2))],
+      proPerKgRange: proRange,
+      fiberG: fiberG, naMax: 2000, cholMax: 300,
+      exchTotal: r1(Math.round(energy / 10) * 10 / EXCH_KCAL),
+      warnings: warn
+    };
+    return rx;
+  }
+
+  /* ------------------------------------------------- ② 交换份分配（分类） */
+  // 谷薯以外的分类按能量占比先固定（并夹在指南推荐量区间内），
+  // 再由谷薯补足碳水目标、肉蛋鱼虾补足蛋白目标、油脂补足脂肪目标（定点迭代）
+  var SHARE = { veg: 0.085, fruit: 0.06, dairy: 0.12, soy: 0.05, nut: 0.035, oil: 0.13 };
+
+  var MEAL_DEF = {
+    breakfast: { label: '早餐', time: '07:00' },
+    morning:   { label: '上午加餐', time: '10:00' },
+    lunch:     { label: '午餐', time: '12:00' },
+    afternoon: { label: '下午加餐', time: '15:30' },
+    dinner:    { label: '晚餐', time: '18:00' },
+    bedtime:   { label: '睡前加餐', time: '21:30' },
+    night:     { label: '夜间加餐', time: '23:00' }
+  };
+
+  var PRESETS = {
+    three: {
+      label: '标准三餐', meals: { breakfast: 0.2, lunch: 0.4, dinner: 0.4 }
+    },
+    three_snack: {
+      label: '三餐 + 2 次加餐',
+      meals: { breakfast: 0.2, morning: 0.05, lunch: 0.3, afternoon: 0.05, dinner: 0.3, bedtime: 0.1 }
+    },
+    six: {
+      label: '少食多餐 6 餐',
+      meals: { breakfast: 0.18, morning: 0.07, lunch: 0.25, afternoon: 0.08, dinner: 0.27, bedtime: 0.15 }
+    },
+    gastroparesis: {
+      label: '胃轻瘫/餐后高血糖 7 餐',
+      meals: { breakfast: 0.15, morning: 0.1, lunch: 0.2, afternoon: 0.1, dinner: 0.2, bedtime: 0.1, night: 0.15 }
+    }
+  };
+
+  // 各分类在三餐/加餐中的分配权重（未列出的餐次为 0）
+  var ALLOC = {
+    three: {
+      grain: { breakfast: 0.3, lunch: 0.4, dinner: 0.3 },
+      veg:   { breakfast: 0.15, lunch: 0.42, dinner: 0.43 },
+      fruit: { breakfast: 0.3, lunch: 0.35, dinner: 0.35 },
+      meat:  { breakfast: 0.25, lunch: 0.375, dinner: 0.375 },
+      soy:   { lunch: 0.5, dinner: 0.5 },
+      dairy: { breakfast: 0.6, dinner: 0.4 },
+      nut:   { breakfast: 0.5, dinner: 0.5 },
+      oil:   { breakfast: 0.15, lunch: 0.45, dinner: 0.4 }
+    },
+    three_snack: {
+      grain: { breakfast: 0.25, lunch: 0.35, dinner: 0.3, bedtime: 0.1 },
+      veg:   { breakfast: 0.12, lunch: 0.44, dinner: 0.44 },
+      fruit: { morning: 0.5, afternoon: 0.5 },
+      meat:  { breakfast: 0.25, lunch: 0.375, dinner: 0.375 },
+      soy:   { lunch: 0.5, dinner: 0.5 },
+      dairy: { breakfast: 0.4, afternoon: 0.3, bedtime: 0.3 },
+      nut:   { morning: 0.5, afternoon: 0.5 },
+      oil:   { breakfast: 0.15, lunch: 0.45, dinner: 0.4 }
+    },
+    six: {
+      grain: { breakfast: 0.2, morning: 0.08, lunch: 0.3, afternoon: 0.08, dinner: 0.24, bedtime: 0.1 },
+      veg:   { breakfast: 0.12, lunch: 0.44, dinner: 0.44 },
+      fruit: { morning: 0.5, afternoon: 0.5 },
+      meat:  { breakfast: 0.25, lunch: 0.375, dinner: 0.375 },
+      soy:   { lunch: 0.5, dinner: 0.5 },
+      dairy: { breakfast: 0.35, afternoon: 0.3, bedtime: 0.35 },
+      nut:   { morning: 0.5, afternoon: 0.5 },
+      oil:   { breakfast: 0.15, lunch: 0.45, dinner: 0.4 }
+    },
+    gastroparesis: {
+      grain: { breakfast: 0.15, morning: 0.12, lunch: 0.2, afternoon: 0.12, dinner: 0.2, bedtime: 0.11, night: 0.1 },
+      veg:   { breakfast: 0.1, morning: 0.1, lunch: 0.25, afternoon: 0.1, dinner: 0.25, bedtime: 0.1, night: 0.1 },
+      fruit: { morning: 0.5, afternoon: 0.5 },
+      meat:  { breakfast: 0.2, morning: 0.1, lunch: 0.25, afternoon: 0.1, dinner: 0.25, bedtime: 0.05, night: 0.05 },
+      soy:   { lunch: 0.5, dinner: 0.5 },
+      dairy: { breakfast: 0.3, morning: 0.2, afternoon: 0.2, bedtime: 0.15, night: 0.15 },
+      nut:   { morning: 0.5, afternoon: 0.5 },
+      oil:   { breakfast: 0.15, lunch: 0.3, dinner: 0.3, night: 0.25 }
+    }
+  };
+
+  // 每 1 交换份（90 kcal）各类食物的代表营养素含量（按实际食物库折算，三大营养素能量≈90 kcal）
+  //   谷薯：米饭 116 kcal/100 g → 78 g/份，碳水 20 g、蛋白 2.0 g
+  //   蔬菜：大白菜 20 kcal/100 g → 约 450 g/份，碳水 17 g、蛋白 5 g（传统交换份表口径：蔬菜 1 份 ≈ 500 g）
+  //   水果：苹果 53 kcal/100 g → 约 170 g/份，碳水 21 g
+  //   乳类：全脂牛奶 65 kcal/100 g → 约 140 g/份，碳水 6.8 g、蛋白 4.6 g
+  //   豆类：北豆腐 116 kcal/100 g → 78 g/份，蛋白 7.2 g
+  //   坚果：核桃（干）646 kcal/100 g → 14 g/份，脂肪 8.2 g
+  //   肉蛋鱼虾：鸡胸 118 kcal/100 g → 76 g/份，蛋白 18.8 g（以瘦肉/鱼虾为口径）
+  //   油脂：1 份 = 10 g 油
+  var PER_EXCH = {
+    grain: { cho: 20, pro: 2.0, fat: 0.4 },
+    veg:   { cho: 17, pro: 5.0, fat: 0.4 },
+    fruit: { cho: 21, pro: 0.8, fat: 0.4 },
+    dairy: { cho: 6.8, pro: 4.6, fat: 5.0 },
+    soy:   { cho: 4.5, pro: 7.5, fat: 5.0 },
+    nut:   { cho: 3.0, pro: 2.5, fat: 8.0 },
+    meat:  { cho: 0.5, pro: 18.0, fat: 2.5 },
+    oil:   { cho: 0, pro: 0, fat: 10 }
+  };
+  // 上表按 1 份 = 90 kcal 归一（避免能量口径不一致导致总能量偏差）
+  (function () {
+    Object.keys(PER_EXCH).forEach(function (k) {
+      var p = PER_EXCH[k], kcal = p.cho * 4 + p.pro * 4 + p.fat * 9;
+      if (k !== 'oil' && kcal > 0) {
+        var s = 90 / kcal;
+        p.cho *= s; p.pro *= s; p.fat *= s; p.kcal = 90;
+      }
+      p.kcal = 90;
+    });
+  })();
+
+  function catExchFromEnergy(cat, energy) {
+    var n = energy * (SHARE[cat] || 0.05) / EXCH_KCAL;
+    // 区间参照指南每日推荐量：蔬菜 300～500 g（1 份≈500 g）、水果 100～200 g（1 份≈200 g）、
+    // 乳类 300 ml（1 份≈140 g 牛奶，2 份≈280 g）、豆制品 100 g 左右、坚果 10 g 左右
+    var lim = {
+      veg: [1.5, 2.5], fruit: [1, 1.5], dairy: [1.5, 2.5], soy: [0.5, 1.5], nut: [0.5, 1]
+    }[cat] || [0, 10];
+    return step(clamp(n, lim[0], lim[1]), 0.5);
+  }
+
+  /**
+   * 生成交换份分配
+   * @param rx 处方对象
+   * @param opts {preset, mealPct, dailyByCat(可覆盖), avoid}
+   */
+  function buildExchangePlan(rx, opts) {
+    opts = opts || {};
+    var preset = PRESETS[opts.preset] ? opts.preset : 'three_snack';
+    var mealPct = (opts.mealPct && Object.keys(opts.mealPct).length) ? opts.mealPct : PRESETS[preset].meals;
+    var warn = [];
+
+    var daily = {};
+    ['veg', 'fruit', 'dairy', 'soy', 'nut'].forEach(function (c) { daily[c] = catExchFromEnergy(c, rx.energy); });
+    daily.oil = step(clamp(rx.fatG * 0.55 / 10, 1.5, 3), 0.5);     // 烹调油约占脂肪目标一半
+    daily.grain = 6; daily.meat = 3;
+    if (opts.dailyByCat) Object.keys(opts.dailyByCat).forEach(function (c) { daily[c] = opts.dailyByCat[c]; });
+
+    // 定点迭代：谷薯补碳水、肉蛋鱼虾补蛋白、油脂补脂肪（已被外部指定的分类不参与迭代）
+    var locked = {};
+    if (opts.dailyByCat) Object.keys(opts.dailyByCat).forEach(function (c) { locked[c] = true; });
+    for (var it = 0; it < 16; it++) {
+      var cur = nutrientOfExch(daily);
+      if (!locked.grain) daily.grain = clamp(daily.grain + (rx.choG - cur.cho) / PER_EXCH.grain.cho, 2, 20);
+      cur = nutrientOfExch(daily);
+      if (!locked.meat) daily.meat = clamp(daily.meat + (rx.proG - cur.pro) / PER_EXCH.meat.pro, 1, 9);
+      cur = nutrientOfExch(daily);
+      if (!locked.oil) daily.oil = clamp(daily.oil + (rx.fatG - cur.fat) / PER_EXCH.oil.fat, 1.5, 3);
+    }
+    ['grain', 'meat', 'oil'].forEach(function (c) {
+      if (!locked[c]) daily[c] = r2(daily[c]);
+      daily[c] = r1(daily[c]);
+    });
+    if (daily.grain > 14) warn.push('谷薯类份数较多（' + daily.grain + ' 份），建议增加全谷杂豆比例并分散到各餐。');
+    if (daily.oil <= 1) warn.push('油脂份数偏低，注意必需脂肪酸与脂溶性维生素摄入。');
+
+    // 分配至各餐（grid：该分类允许的最小份数粒度，保证克数在日常生活中可用）
+    var alloc = ALLOC[preset];
+    var GRID = { grain: 0.5, veg: 0.5, fruit: 0.5, meat: 0.25, soy: 0.5, dairy: 0.5, nut: 0.5, oil: 0.5 };
+    var meals = Object.keys(mealPct).map(function (k) {
+      return { key: k, label: (MEAL_DEF[k] || {}).label || k, time: (MEAL_DEF[k] || {}).time || '', pct: mealPct[k], byCat: {} };
+    });
+    meals.forEach(function (m) { ['grain', 'veg', 'fruit', 'meat', 'soy', 'dairy', 'nut', 'oil'].forEach(function (c) { m.byCat[c] = 0; }); });
+    Object.keys(alloc).forEach(function (cat) {
+      var w = alloc[cat] || {};
+      var keys = meals.map(function (m) { return m.key; }).filter(function (k) { return (w[k] || 0) > 0; });
+      if (!keys.length || !(daily[cat] > 0)) return;
+      var grid = GRID[cat] || 0.5;
+      var sumW = keys.reduce(function (a, k) { return a + w[k]; }, 0);
+      var assigned = 0;
+      keys.forEach(function (k, i) {
+        var isLast = (i === keys.length - 1);
+        var v = isLast ? r2(daily[cat] - assigned)
+                       : Math.round((daily[cat] * w[k] / sumW) / grid) * grid;
+        if (v < 0) v = 0;                       // 前项取整过大时，最后由回退步骤补齐
+        var m = meals.filter(function (x) { return x.key === k; })[0];
+        m.byCat[cat] = r2(v);
+        assigned = r2(assigned + v);
+      });
+      // 修正：若合计与目标不符（取整造成），从份数最多的餐次回退
+      var gap = r2(daily[cat] - assigned);
+      if (Math.abs(gap) > 0.01) {
+        var donors = meals.filter(function (x) { return x.byCat[cat] > 0; })
+          .sort(function (a, b) { return b.byCat[cat] - a.byCat[cat]; });
+        if (donors.length) {
+          var d0 = donors[0];
+          var nv = r2(d0.byCat[cat] + gap);
+          d0.byCat[cat] = nv > 0 ? nv : 0;
+        }
+      }
+    });
+    meals.forEach(function (m) {
+      m.energy = Math.round(nutrientOfExch(m.byCat).kcal);
+      m.pctActual = r1(m.energy / rx.energy * 100);
+    });
+    return { preset: preset, presetLabel: PRESETS[preset].label, dailyByCat: daily, meals: meals, warnings: warn };
+  }
+
+  // 用代表值把「份数结构」折算成营养素（求解用）
+  function nutrientOfExch(byCat) {
+    var o = { kcal: 0, pro: 0, fat: 0, cho: 0 };
+    Object.keys(byCat).forEach(function (c) {
+      var n = byCat[c] || 0, p = PER_EXCH[c];
+      if (!p) return;
+      o.kcal += 90 * n;
+      o.pro += p.pro * n; o.fat += p.fat * n; o.cho += p.cho * n;
+    });
+    return o;
+  }
+
+  /* ---------------------------------------------- ③ 交换份 → 具体食物 */
+  // 各餐候选食物（按优先级排列，食材名与食物库一致）
+  var PICKS = {
+    breakfast: {
+      grain: ['燕麦', '玉米（鲜）', '甘薯（红心）［山芋、红薯］', '荞麦面', '小米粥', '粳米粥', '馒头（代表值）', '花卷', '通心面［通心粉］', '小米'],
+      meat:  ['鸡蛋（代表值）', '鸡蛋白', '牛肉（里脊肉）［牛柳］', '斑节对虾［草虾］'],
+      dairy: ['纯牛奶（代表值，全脂）', '纯牛奶（代表值，脱脂）', '酸奶'],
+      soy:   ['豆浆', '豆腐（内酯）'],
+      veg:   ['黄瓜（鲜）［胡瓜］', '番茄［西红柿］', '生菜［叶用莴苣］', '大白菜（代表值）', '木耳（水发）［黑木耳，云耳］'],
+      fruit: ['苹果（代表值）', '梨（代表值）', '柚［文旦］', '草莓［洋莓，凤阳草莓］'],
+      nut:   ['核桃（干）［胡桃］', '杏仁（原味）', '花生仁（生）'],
+      oil:   ['橄榄油', '花生油']
+    },
+    lunch: {
+      grain: ['米饭（蒸，代表值）', '玉米（鲜）', '荞麦面', '通心面［通心粉］', '糙米', '黑米', '藜麦（散装）'],
+      meat:  ['鸡胸脯肉', '牛肉（里脊肉）［牛柳］', '草鱼', '鲈鱼［鲈花］', '鳕鱼［鳕狭、明太鱼］', '斑节对虾［草虾］', '牛肉（后腿）'],
+      soy:   ['豆腐（北豆腐）', '豆腐干（代表值）', '千张［百页］', '豆腐（南豆腐）'],
+      veg:   ['西兰花［绿菜花］', '菠菜（鲜）［赤根菜］', '油菜', '芹菜茎', '番茄［西红柿］', '茄子（代表值）', '苦瓜（鲜）［凉瓜，癞瓜］', '豆角', '香菇（鲜）［香蕈，冬菇］', '木耳（水发）［黑木耳，云耳］'],
+      fruit: ['苹果（代表值）', '橙', '猕猴桃', '桃（代表值）'],
+      nut:   ['核桃（干）［胡桃］', '腰果（熟）'],
+      oil:   ['花生油', '橄榄油', '玉米油']
+    },
+    dinner: {
+      grain: ['米饭（蒸，代表值）', '甘薯（红心）［山芋、红薯］', '玉米（鲜）', '荞麦面', '糙米', '山药（鲜）［薯蓣，大薯］', '芋头［芋艿、毛芋］'],
+      meat:  ['鲫鱼［喜头鱼、海附鱼］', '鲑鱼［大马哈鱼、三文鱼］', '带鱼［白带鱼、刀鱼］', '鸡腿', '鸡胸脯肉', '海参（水浸）', '牛肉（里脊肉）［牛柳］'],
+      soy:   ['豆腐（南豆腐）', '豆腐（北豆腐）', '豆腐（内酯）'],
+      veg:   ['油菜', '菠菜（鲜）［赤根菜］', '茼蒿（鲜）［蓬蒿菜，艾菜］', '蕹菜［空心菜、藤藤菜］', '苋菜（绿，鲜）', '冬瓜', '黄瓜（鲜）［胡瓜］', '甜椒［灯笼椒、柿子椒］', '海带（浸）［江白菜，昆布］', '香菇（鲜）［香蕈，冬菇］'],
+      fruit: ['苹果（代表值）', '柚［文旦］', '梨（代表值）', '樱桃'],
+      nut:   ['核桃（干）［胡桃］', '杏仁（原味）'],
+      dairy: ['纯牛奶（代表值，全脂）', '酸奶', '纯牛奶（代表值，脱脂）'],
+      oil:   ['花生油', '橄榄油', '玉米油']
+    },
+    // 加餐：以水果 / 乳类 / 坚果 / 少量主食为主
+    morning:   { fruit: ['苹果（代表值）', '梨（代表值）', '猕猴桃', '橙'], dairy: ['酸奶', '纯牛奶（代表值，全脂）'], nut: ['杏仁（原味）', '核桃（干）［胡桃］'], grain: ['玉米（鲜）', '甘薯（红心）［山芋、红薯］'] },
+    afternoon: { fruit: ['草莓［洋莓，凤阳草莓］', '柚［文旦］', '梨（代表值）', '苹果（代表值）'], dairy: ['酸奶', '纯牛奶（代表值，脱脂）'], nut: ['核桃（干）［胡桃］', '花生仁（生）'], grain: ['玉米（鲜）', '通心面［通心粉］'] },
+    bedtime:   { dairy: ['纯牛奶（代表值，全脂）', '酸奶'], nut: ['核桃（干）［胡桃］', '杏仁（原味）'], grain: ['燕麦', '甘薯（红心）［山芋、红薯］', '馒头（代表值）'], meat: ['鸡蛋（代表值）', '鸡蛋白'], soy: ['豆浆'], veg: ['黄瓜（鲜）［胡瓜］'] },
+    night:     { dairy: ['纯牛奶（代表值，全脂）'], nut: ['杏仁（原味）'], grain: ['燕麦'], meat: ['鸡蛋（代表值）'], veg: ['黄瓜（鲜）［胡瓜］'] }
+  };
+
+  // 口味模板微调
+  var FLAVOR = {
+    cn:     {},
+    simple: { tagPrefer: ['lowGI'], note: '简易快手：优先 10 分钟内可完成的蒸、煮、拌做法。' },
+    veg:    { note: '素食为主：用豆制品与豆浆替代部分肉类，注意补充维生素 B12 与铁。', swapMeatToSoy: true },
+    lowgi:  { tagPrefer: ['lowGI', 'wholeGrain'], note: '低 GI 强化：主食优先全谷杂豆与低 GI 品种。' }
+  };
+
+  // 某分类在某餐没有候选时使用的兜底清单（保证份数不会因为缺少候选而丢失）
+  function fallbackList(cat) {
+    var order = [['dinner', cat], ['lunch', cat], ['breakfast', cat]];
+    for (var i = 0; i < order.length; i++) {
+      var m = PICKS[order[i][0]];
+      if (m && m[cat] && m[cat].length) return m[cat];
+    }
+    return DB.filter(function (f) { return f.cat === cat; }).map(function (f) { return f.name; });
+  }
+
+  function candidates(mealKey, cat, opts) {
+    var t = (PICKS[mealKey] || {})[cat];
+    if (!t || !t.length) t = fallbackList(cat);
+    var flavor = FLAVOR[opts.flavor] || {};
+    var out = [];
+    t.forEach(function (n) {
+      var f = F(n);
+      if (!f) return;
+      if (opts.exclude && opts.exclude.indexOf(n) >= 0) return;
+      out.push(f);
+    });
+    // 标签偏好排序：符合偏好的排前面（保持原有优先级的相对顺序）
+    if (flavor.tagPrefer && flavor.tagPrefer.length) {
+      out.sort(function (a, b) {
+        var sa = flavor.tagPrefer.some(function (t) { return a.tags.indexOf(t) >= 0; }) ? 0 : 1;
+        var sb = flavor.tagPrefer.some(function (t) { return b.tags.indexOf(t) >= 0; }) ? 0 : 1;
+        return sa - sb;
+      });
+    }
+    if (opts.lowGIPrefer) {
+      out.sort(function (a, b) { return (a.gi == null ? 60 : a.gi) - (b.gi == null ? 60 : b.gi); });
+    }
+    // 脂肪预算紧张时（超重/肥胖、血脂异常或脂肪供能比偏高）：乳类/豆制品/坚果优选低脂品种
+    if (opts.lowFatPrefer && ['dairy', 'soy', 'nut'].indexOf(cat) >= 0) {
+      out.sort(function (a, b) { return a.fat - b.fat; });
+    }
+    return out;
+  }
+
+  /** 把某餐某分类的份数拆成 1～2 个具体食物 */
+  function pickItems(mealKey, cat, exch, opts, used, ctx) {
+    opts = opts || {};
+    ctx = ctx || { chol: 0 };
+    if (!exch || exch <= 0) return [];
+    var list = candidates(mealKey, cat, opts);
+    if (!list.length) return [];
+    var chosen = [];
+
+    // 同一天同类尽量不重复：肉类/蔬菜/豆制品/水果优先换新；主食与油可以重复
+    var applyFresh = ['meat', 'veg', 'soy', 'fruit'].indexOf(cat) >= 0;
+    var fresh = list.filter(function (f) { return !(used[cat] || {})[f.name]; });
+    var pool = (applyFresh && fresh.length) ? fresh : list;
+
+    // 蔬菜优先高纤维品种（木耳、香菇、秋葵、苋菜等），有利于达到膳食纤维目标
+    if (cat === 'veg') {
+      var hiFib = pool.filter(function (f) { return f.fib >= 2.0; });
+      if (hiFib.length && pool[0].fib < 1.5) pool = hiFib.concat(pool);
+      // 深色蔬菜（含菌藻）占比不足 50% 时，优先安排深色蔬菜
+      if (ctx.darkExch < 0.5 * (ctx.vegExch + exch)) {
+        var dark = pool.filter(function (f) { return f.tags.indexOf('darkVeg') >= 0; });
+        if (dark.length) pool = dark.concat(pool.filter(function (f) { return dark.indexOf(f) < 0; }));
+      }
+    }
+    // 主食：当天全谷杂豆占比不足 1/3 时，强制其中一样为主食池中的全谷杂豆
+    if (cat === 'grain' && opts.forceWhole) {
+      var wh = pool.filter(function (f) { return f.tags.indexOf('wholeGrain') >= 0; });
+      if (wh.length) { pool = [wh[0]].concat(pool.filter(function (f) { return f !== wh[0]; })); }
+    }
+
+    // 胆固醇预算：动物性食物若会把全天胆固醇推到 280 mg 以上则跳过（鸡蛋全天上限约 1 个）
+    var eggUsed = (used.egg || 0);
+    pool = pool.filter(function (f) {
+      var g = gramsFor(f, exch) * (cat === 'meat' ? 1 : 0);
+      var pot = (f.chol || 0) * g / 100;
+      if (cat === 'meat' && f.tags.indexOf('egg') >= 0 && eggUsed >= 1) return false;
+      if (ctx.chol + pot > 250 && pot > 40) return false;
+      return true;
+    });
+    if (!pool.length) pool = list;
+
+    // 份数拆分：大份食物拆到 1～2 种，蔬菜按克数上限再拆
+    var plan;
+    if (cat === 'grain' && exch >= 2) plan = [0.6, 0.4];
+    else if (cat === 'veg' && gramsFor(pool[0], exch) > 400) plan = [0.6, 0.4];
+    else if (exch >= 1.5 && pool.length > 1) plan = [0.65, 0.35];
+    else plan = [1];
+
+    var rest = exch;
+    for (var i = 0; i < plan.length; i++) {
+      var f = pool[i % pool.length];
+      if (cat === 'grain' && i > 0 && !opts.noWholeGrain) {
+        // 主食搭配：第二样优先选全谷杂豆，保证 ≥1/3 全谷
+        var whole = pool.filter(function (x) { return x.tags.indexOf('wholeGrain') >= 0 && x.name !== pool[0].name; });
+        if (whole.length) f = whole[0];
+      }
+      var e = i === plan.length - 1 ? rest : step(exch * plan[i], 0.5);
+      e = Math.min(e, rest);
+      if (e <= 0.24) continue;
+      rest = r1(rest - e);
+      var g = gramsFor(f, e);
+      // 蔬菜单条克数上限 350 g，超出部分再分一种
+      if (cat === 'veg' && g > 350 && pool.length > i + 1) {
+        var e2 = step((g - 300) / gramsFor(f, 1) * 1, 0.5);
+        if (e2 > 0.24 && e2 < e) {
+          chosen.push({ food: f, exch: r1(e - e2) });
+          (used[cat] = used[cat] || {})[f.name] = true;
+          ctx.chol += (f.chol || 0) * gramsFor(f, e - e2) / 100;
+          var f2 = pool[i + 1];
+          chosen.push({ food: f2, exch: r1(e2) });
+          (used[cat] = used[cat] || {})[f2.name] = true;
+          ctx.chol += (f2.chol || 0) * gramsFor(f2, e2) / 100;
+          rest = r1(rest);
+          continue;
+        }
+      }
+      chosen.push({ food: f, exch: e });
+      (used[cat] = used[cat] || {})[f.name] = true;
+      if (f.tags.indexOf('egg') >= 0) used.egg = (used.egg || 0) + 1;
+      ctx.chol += (f.chol || 0) * g / 100;
+      if (rest <= 0.24) break;
+    }
+    return chosen;
+  }
+
+  function gramsFor(food, exch) { return exch / food.exch100 * 100; }
+
+  /** 生成完整一日食谱（含具体食物与克数） */
+  function buildMealItems(plan, opts) {
+    opts = opts || {};
+    var profile = opts.profile || {};
+    // 合并症过滤
+    var blockList = [];
+    if (profile.comorb && profile.comorb.gout) {
+      DB.forEach(function (f) { if (f.tags.indexOf('purineHigh') >= 0) blockList.push(f.name); });
+    }
+    if (profile.ckd === 'ckd45') {
+      DB.forEach(function (f) { if (f.tags.indexOf('ckdCaution') >= 0) blockList.push(f.name); });
+    }
+    var used = {};
+    var ctx = { chol: 0, vegExch: 0, darkExch: 0, grainExch: 0, wholeExch: 0 };
+    plan.meals.forEach(function (m) {
+      m.items = [];
+      var cats = ['grain', 'veg', 'meat', 'soy', 'dairy', 'fruit', 'nut', 'oil'];
+      cats.forEach(function (cat) {
+        var e = m.byCat[cat] || 0;
+        if (e <= 0) return;
+        var block = blockList;
+        // 素食模板：把肉类的份数转到豆类
+        if ((FLAVOR[opts.flavor] || {}).swapMeatToSoy && cat === 'meat') {
+          m.byCat.soy = r1((m.byCat.soy || 0) + e * 0.5);
+          e = e * 0.5;
+        }
+        // 主餐主食：当天全谷杂豆尚未达到 1/3 时强制搭配（早餐燕麦/玉米等本身多为全谷）
+        var forceWhole = false;
+        if (cat === 'grain' && ['lunch', 'dinner'].indexOf(m.key) >= 0) {
+          var totalAfter = ctx.grainExch + e;
+          forceWhole = (ctx.wholeExch + 0.01) / Math.max(0.01, totalAfter) < 0.34;
+        }
+        var picks = pickItems(m.key, cat, e, {
+          flavor: opts.flavor, lowGIPrefer: !!opts.lowGIPrefer, exclude: block,
+          lowFatPrefer: !!opts.lowFatPrefer, forceWhole: forceWhole
+        }, used, ctx);
+        picks.forEach(function (p) {
+          var g = gramsFor(p.food, p.exch);
+          // 鸡蛋等天然单个食物按「半个 / 1 个」取整，避免出现 0.25 个鸡蛋这种无法执行的量
+          if (p.food.tags.indexOf('egg') >= 0 && p.food.unitG) {
+            var half = p.food.unitG / 2;
+            g = Math.max(half, Math.round(g / half) * half);
+          }
+          var grams = Math.round(g / 5) * 5;
+          var exch = r2(grams / 100 * p.food.exch100);
+          m.items.push({
+            food: p.food, exch: exch, grams: grams,
+            rawGrams: Math.round(g), dry: isDry(p.food), cat: cat
+          });
+          if (cat === 'grain') {
+            ctx.grainExch += exch;
+            if (p.food.tags.indexOf('wholeGrain') >= 0) ctx.wholeExch += exch;
+          }
+          if (cat === 'veg') {
+            ctx.vegExch += exch;
+            if (p.food.tags.indexOf('darkVeg') >= 0) ctx.darkExch += exch;
+          }
+        });
+      });
+      m.nutri = sumItems(m.items);
+    });
+    return plan;
+  }
+
+  /**
+   * 生成「一日方案」：先按处方分配交换份，再按实际食物回算营养，
+   * 用 2～3 轮校准把总能量/碳水/蛋白/脂肪的偏差压到 ±3% 以内。
+   */
+  function buildDay(rx, opts) {
+    opts = opts || {};
+    var overrides = opts.dailyByCat ? JSON.parse(JSON.stringify(opts.dailyByCat)) : null;
+    var plan, day, iter = 0, lowFat = false;
+    // 超重/肥胖、血脂异常者一开始就按低脂思路选乳类与豆制品
+    if (rx.bodyType === 'over' || (opts.profile && opts.profile.comorb && opts.profile.comorb.lipid)) lowFat = true;
+    for (iter = 0; iter < 10; iter++) {
+      var o = {};
+      Object.keys(opts).forEach(function (k) { o[k] = opts[k]; });
+      if (overrides) o.dailyByCat = overrides;
+      o.lowFatPrefer = lowFat;
+      plan = buildExchangePlan(rx, o);
+      buildMealItems(plan, o);
+      day = sumMeals(plan.meals);
+      if (!overrides) overrides = {};
+      var dCho = rx.choG - day.cho, dPro = rx.proG - day.pro, dFat = rx.fatG - day.fat;
+      // 收敛条件：按 4/4/9 折算能量 ±2%，碳水 ±5%，蛋白 ±8%，脂肪 ±10% 同时满足
+      var ok = Math.abs(day.macroKcal - rx.energy) / rx.energy <= 0.02 &&
+        Math.abs(dCho) / Math.max(1, rx.choG) <= 0.05 &&
+        Math.abs(dPro) / Math.max(1, rx.proG) <= 0.08 &&
+        Math.abs(dFat) / Math.max(1, rx.fatG) <= 0.10;
+      if (ok) break;
+      if (dFat < -0.1 * rx.fatG && !lowFat) lowFat = true;   // 脂肪超标 → 换低脂乳类/豆制品
+      var damp = 0.8;   // 阻尼，避免在取整边界上来回振荡
+      var g0 = overrides.grain || plan.dailyByCat.grain;
+      var m0 = overrides.meat || plan.dailyByCat.meat;
+      var o0 = overrides.oil || plan.dailyByCat.oil;
+      overrides.grain = r2(clamp(g0 * (1 + damp * dCho / Math.max(1, day.cho)), 2, 20));
+      overrides.meat = r2(clamp(m0 * (1 + damp * dPro / Math.max(1, day.pro)), 1, 9));
+      overrides.oil = r2(clamp(o0 + damp * dFat / 10, 1.5, 3));
+    }
+    return {
+      plan: plan, day: day, iterations: iter,
+      checks: runChecks(day, rx, opts.profile || {}, { meals: plan.meals, preset: plan.preset })
+    };
+  }
+
+  /* ------------------------------------------------------ ④ 营养与自检 */
+  function sumItems(items) {
+    var o = { kcal: 0, pro: 0, fat: 0, cho: 0, fib: 0, na: 0, chol: 0, k: 0, gl: 0, glKnownKcal: 0, giNum: 0, giDen: 0, mass: 0 };
+    (items || []).forEach(function (it) {
+      var f = it.food, g = (it.grams || 0) / 100;
+      o.kcal += f.kcal * g; o.pro += f.pro * g; o.fat += f.fat * g; o.cho += f.cho * g;
+      o.fib += f.fib * g; o.na += (f.na || 0) * g; o.chol += (f.chol || 0) * g; o.k += (f.k || 0) * g;
+      o.mass += it.grams || 0;
+      if (f.gi != null) {
+        o.gl += f.gi * f.cho * g / 100;
+        o.giNum += f.gi * f.cho * g; o.giDen += f.cho * g;
+      } else {
+        o.glKnownKcal += f.kcal * g;
+      }
+    });
+    o.giAvg = o.giDen > 0 ? o.giNum / o.giDen : null;
+    // 按 4/4/9 折算的能量：与成分表「能量」列可能有几个百分点的差异
+    // （成分表能量按 Atwater 系数并考虑膳食纤维、有机酸等计算，供能比应以本值为分母）
+    o.macroKcal = o.cho * 4 + o.pro * 4 + o.fat * 9;
+    return o;
+  }
+
+  function sumMeals(meals) {
+    var all = [];
+    meals.forEach(function (m) { all = all.concat(m.items || []); });
+    var t = sumItems(all);
+    t.byCat = {};
+    meals.forEach(function (m) {
+      Object.keys(m.byCat || {}).forEach(function (c) { t.byCat[c] = r1((t.byCat[c] || 0) + m.byCat[c]); });
+    });
+    return t;
+  }
+
+  function runChecks(day, rx, profile, opts) {
+    profile = profile || {}; opts = opts || {};
+    var rows = [];
+    function add(name, target, actual, pass, note, level) {
+      rows.push({ name: name, target: target, actual: actual, pass: pass, note: note || '', level: level || 'key' });
+    }
+    var de = (day.kcal - rx.energy) / rx.energy * 100;
+    var deM = (day.macroKcal - rx.energy) / rx.energy * 100;
+    add('每日总能量', rx.energy + ' kcal', Math.round(day.kcal) + ' kcal（偏差 ' + r1(de) + '%）',
+      Math.abs(de) <= 7,
+      '食物成分表「能量」按 Atwater 系数并计入膳食纤维等，与 4/4/9 折算值（本次 ' + Math.round(day.macroKcal) +
+      ' kcal，偏差 ' + r1(deM) + '%）通常相差 3%～5%，两者均在 ±10% 以内即视为达到能量目标。');
+
+    var choPct = day.cho * 4 / day.macroKcal * 100, proPct = day.pro * 4 / day.macroKcal * 100, fatPct = day.fat * 9 / day.macroKcal * 100;
+    add('碳水供能比', '45%～60%', r1(choPct) + '%', choPct >= 44.5 && choPct <= 60.5,
+      '碳水不宜过低（易低血糖、依从性差），也不宜过高（餐后血糖波动大）。');
+    add('蛋白质', rx.proRangeG[0] + '～' + rx.proRangeG[1] + ' g（' + rx.proPerKgRange[0] + '～' + rx.proPerKgRange[1] + ' g/kg）',
+      Math.round(day.pro) + ' g（' + r1(proPct) + '%E，' + r1(day.pro / rx.ibw) + ' g/kg）',
+      day.pro >= rx.proRangeG[0] * 0.95 && day.pro <= rx.proRangeG[1] * 1.05,
+      '每餐 15～25 g 优质蛋白、分散摄入更有利于肌肉合成；本合计含谷薯、蔬菜、乳类中的植物蛋白。');
+    add('脂肪供能比', '20%～30%', r1(fatPct) + '%', fatPct <= 32 && fatPct >= 18,
+      '饱和脂肪 <7% 总能量；合并血脂异常者优先不饱和脂肪。');
+    add('膳食纤维', '≥ ' + rx.fiberG + ' g（14 g/1000 kcal）', r1(day.fib) + ' g', day.fib >= rx.fiberG * 0.9,
+      '全谷杂豆、蔬菜、适量水果与坚果是膳食纤维主要来源；成分表中缺失项已按估算值计入（标 ≈）。');
+    add('膳食胆固醇', '参考 <300 mg（1 个鸡蛋≈320 mg）', Math.round(day.chol) + ' mg', day.chol < 450,
+      '2023 年中国血脂管理指南不再设膳食胆固醇硬性上限；糖尿病合并血脂异常/ASCVD 者仍建议每日蛋黄 ≤1 个、限制动物内脏与肥肉。', 'watch');
+    add('钠（食物本身，不含调味品）', '< 2000 mg', Math.round(day.na) + ' mg', day.na < 2000,
+      '食盐 <5 g/d；酱油、咸菜、加工肉、挂面等隐形钠也要计入。', 'watch');
+    var vegG = 0, darkG = 0, vegMainG = 0, grainG = 0, wholeGrainG = 0, oilG = 0, fruitG = 0, dairyG = 0;
+    day.byCat = day.byCat || {};
+    (opts.meals || []).forEach(function (m) {
+      var isSnack = /加餐/.test(m.label || '');
+      (m.items || []).forEach(function (it) {
+        var f = it.food, g = it.grams;
+        if (f.cat === 'veg') {
+          vegG += g;
+          // 深色蔬菜占比只统计正餐（加餐的黄瓜/番茄属于额外补充，不参与评价）
+          if (!isSnack) {
+            vegMainG += g;
+            if (f.tags.indexOf('darkVeg') >= 0 || f.tags.indexOf('fungus') >= 0 || f.tags.indexOf('seaweed') >= 0) darkG += g;
+          }
+        }
+        if (f.cat === 'grain') { grainG += g; if (f.tags.indexOf('wholeGrain') >= 0) wholeGrainG += g; }
+        if (f.cat === 'oil') oilG += g;
+        if (f.cat === 'fruit') fruitG += g;
+        if (f.cat === 'dairy') dairyG += g;
+      });
+    });
+    add('蔬菜量', '400～600 g（约 1～1.5 交换份）', Math.round(vegG) + ' g', vegG >= 350, '餐餐有蔬菜，深色蔬菜占一半以上；菌藻类（木耳、香菇、海带）膳食纤维高，建议每天 1 种。');
+    add('深色蔬菜与菌藻占比', '≥ 50%（正餐蔬菜）', vegMainG ? r1(darkG / vegMainG * 100) + '%' : '—', vegMainG > 0 && darkG / vegMainG >= 0.5, '深色蔬菜（菠菜、油菜、西兰花、番茄、胡萝卜等）与菌藻类富含 β-胡萝卜素、维生素 C、钾与可溶性膳食纤维；正餐蔬菜合计 ' + Math.round(vegMainG) + ' g。');
+    add('全谷杂豆占主食比例', '≥ 1/3', grainG ? r1(wholeGrainG / grainG * 100) + '%' : '—', grainG > 0 && wholeGrainG / grainG >= 0.33, '全谷杂豆 GI 更低、膳食纤维更高。');
+    add('烹调油', '25～30 g（15～33 g 可接受）', Math.round(oilG) + ' g', oilG >= 15 && oilG <= 33, '建议蒸、煮、炖、拌，少煎炸；坚果与乳类中的脂肪也要计入全天脂肪。');
+    add('水果', '100～300 g（1 交换份≈200 g）', Math.round(fruitG) + ' g', fruitG >= 100 && fruitG <= 320, '血糖平稳时（餐后 2 h <10 mmol/L、HbA1c <7%）可吃水果，放在两餐之间。');
+    add('乳类', '≥ 250～300 g', Math.round(dairyG) + ' g', dairyG >= 200, '无糖酸奶或纯牛奶，注意乳糖不耐受者选用无乳糖或酸奶。');
+    var maxGL = 0, maxGLMeal = '', maxMealCho = 1;
+    (opts.meals || []).forEach(function (m) {
+      if (!m.nutri) return;
+      if (m.nutri.gl > maxGL) { maxGL = m.nutri.gl; maxGLMeal = m.label; }
+      maxMealCho = Math.max(maxMealCho, m.nutri.cho);
+    });
+    add('平均 GI（按碳水加权）', '≤55 为低 GI，≤60 为中等', day.giAvg == null ? '—' : r1(day.giAvg),
+      day.giAvg != null && day.giAvg <= 60,
+      '把白米饭、白粥、馒头换成全谷杂豆、玉米、薯类，餐后血糖峰值更低；这是控制餐后血糖最有效的饮食抓手。');
+    add('单餐血糖负荷 GL', '理想 ≤25（本餐 ' + Math.round(maxMealCho) + ' g 碳水）', r1(maxGL) + (maxGLMeal ? '（' + maxGLMeal + '）' : ''),
+      maxGL <= 35, 'GL = GI × 可利用碳水(g) / 100。餐次能量越大 GL 越高，关键是降低该餐平均 GI。', 'watch');
+    add('全天血糖负荷 GL', '理想 ≤80（低 GL 膳食）', r1(day.gl), day.gl <= 110,
+      'GL 总量随全天能量上升；若偏高，优先减少精制主食、增加全谷杂豆与蔬菜。', 'watch');
+    if (profile.comorb && profile.comorb.gp) {
+      add('胃轻瘫适配', '低脂、低渣、少量多餐', opts.preset === 'gastroparesis' ? '已用 7 餐少量方案' : '建议改用少量多餐方案',
+        opts.preset === 'gastroparesis', '避免高脂、粗纤维过多与一次大量进食。');
+    }
+    if (profile.comorb && profile.comorb.gout) {
+      add('高尿酸/痛风', '避免高嘌呤食物', '已自动排除动物内脏等高嘌呤食物', true, '限制浓肉汤、海鲜与酒精（尤其啤酒）。');
+    }
+    if (profile.ckd === 'ckd45') {
+      add('CKD 4～5 期', '限蛋白、限钾磷', '已按 0.8 g/kg 与低钾磷食物库筛选', true, '需肾科营养师个体化调整，必要时补充复方α酮酸。');
+    }
+    return rows;
+  }
+
+  /* -------------------------------------------------------- ⑤ 等量替换 */
+  /** 找出可平替的食物：默认同分类、按指定营养素等价 */
+  function swapCandidates(src, mode, opts) {
+    opts = opts || {};
+    mode = mode || 'carb';
+    var key = mode === 'energy' ? 'kcal' : (mode === 'protein' ? 'pro' : 'cho');
+    var ref = src[key] || 0.0001;
+    var out = [];
+    DB.forEach(function (f) {
+      if (f.name === src.name) return;
+      if (opts.sameCat !== false && f.cat !== src.cat) return;
+      if (f[key] <= 0) return;
+      var ratio = ref / f[key];                  // 等量替换比例（以 100 g 计）
+      if (ratio < 0.2 || ratio > 8) return;      // 差异过大不作为平替
+      if (opts.lowGI && src.gi != null && f.gi != null && f.gi > src.gi + 2) return;
+      var g = ratio * 100;
+      var d = {
+        food: f, grams: Math.round(g / 5) * 5, ratio: r2(ratio),
+        exchDiff: r2(f.exch100 * g / 100 - src.exch100 * 100 / 100),
+        delta: {
+          kcal: r1(f.kcal * g / 100 - src.kcal), pro: r1(f.pro * g / 100 - src.pro),
+          fat: r1(f.fat * g / 100 - src.fat), cho: r1(f.cho * g / 100 - src.cho),
+          fib: r1(f.fib * g / 100 - src.fib),
+          gl: r1(f.gi != null ? f.gi * f.cho * g / 10000 : 0) - r1(src.gi != null ? src.gi * src.cho / 100 : 0)
+        }
+      };
+      if (opts.onlyLowerGL && d.delta.gl > 0.5) return;
+      out.push(d);
+    });
+    out.sort(function (a, b) {
+      // 排序原则：先看 GI（越低越好），全谷杂豆/薯类优先，
+      // 纯淀粉制品（粉丝、粉条、藕粉）GI 虽低但营养素密度低，作为末选
+      function rank(f) {
+        var r = (f.gi == null ? 60 : f.gi);
+        if (f.tags.indexOf('pureCarb') >= 0) r += (src.tags.indexOf('pureCarb') >= 0 ? 0 : 60);
+        if (f.tags.indexOf('wholeGrain') >= 0) r -= 6;
+        if (f.tags.indexOf('potato') >= 0) r -= 3;
+        r -= Math.min(6, (f.fib || 0) * 1.5);
+        return r;
+      }
+      return rank(a.food) - rank(b.food);
+    });
+    return out;
+  }
+
+  /** 在食谱中把某个食物替换为另一个（保持交换份不变，克数按等价重算） */
+  function swapInItem(item, newFood) {
+    var grams = item.exch / newFood.exch100 * 100;
+    return { food: newFood, exch: item.exch, grams: Math.round(grams / 5) * 5, rawGrams: Math.round(grams), dry: isDry(newFood), cat: newFood.cat, swappedFrom: item.food.name };
+  }
+
+  /** 替换食物库（导入自定义数据后调用，保证引擎内部的名称索引同步更新） */
+  function reloadDB(list) {
+    if (!list || !list.length) return false;
+    DB.length = 0;
+    Object.keys(BY_NAME).forEach(function (k) { delete BY_NAME[k]; });
+    list.forEach(function (f) {
+      if (!f || !f.name || !(f.kcal > 0)) return;
+      if (f.exch100 == null) f.exch100 = f.kcal / EXCH_KCAL;
+      if (!f.cat) f.cat = 'grain';
+      if (!f.tags) f.tags = [];
+      DB.push(f);
+      BY_NAME[f.name] = f;
+    });
+    global.FOOD_DB = DB;
+    return DB.length > 0;
+  }
+
+  global.PrescEngine = {
+    DB: DB, BY_NAME: BY_NAME, F: F, CAT_META: CAT_META, MEAL_DEF: MEAL_DEF, PRESETS: PRESETS,
+    computePrescription: computePrescription,
+    buildExchangePlan: buildExchangePlan,
+    buildMealItems: buildMealItems,
+    buildDay: buildDay,
+    sumItems: sumItems, sumMeals: sumMeals,
+    runChecks: runChecks,
+    swapCandidates: swapCandidates, swapInItem: swapInItem,
+    gramsFor: gramsFor, isDry: isDry, r1: r1, r2: r2, step: step, clamp: clamp,
+    nutrientOfExch: nutrientOfExch, reloadDB: reloadDB
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/* ==== engine-glucose.js ==== */
+/* =====================================================================
+ * engine-glucose.js —— 血糖 · 运动联动再计算引擎
+ *
+ *   输入：当前血糖、趋势箭头、测量时段、距上一餐时间、症状、酮体、
+ *         下一步计划（进餐/运动/睡觉）、计划运动强度与时长、患者特征
+ *   输出：① 血糖分级判读  ② 进餐时间调整  ③ 主食量与种类调整
+ *         ④ 加餐/低血糖处理  ⑤ 运动处方（能否运动、何时、强度、时长、监测点）
+ *         ⑥ 复测计划与就医预警  ⑦ 当日时间轴
+ *   另含：连续血糖（CGM/血糖仪）数据统计（TIR/TAR/TBR、GMI、CV）
+ *
+ *   依据：中国糖尿病防治指南与医学营养/运动治疗相关推荐值，
+ *         阈值集中在 RULES 中，可在界面「数据与设置」中调整。
+ * ===================================================================== */
+(function (global) {
+  'use strict';
+
+  var DEFAULT_RULES = {
+    hypoSerious: 3.0,        // 严重低血糖
+    hypoLow: 3.9,            // 低血糖阈值
+    preMealIdealLow: 4.4,    // 空腹/餐前理想下限
+    preMealIdealHigh: 7.0,   // 空腹/餐前理想上限
+    targetLow: 3.9,          // CGM 目标范围下限
+    targetHigh: 10.0,        // 餐后目标上限 / CGM 目标范围上限
+    slightlyHigh: 10.0,
+    veryHigh: 13.9,          // 运动禁忌与强化干预阈值
+    dkaWarn: 16.7,           // 警惕 DKA/HHS
+    sleepTargetLow: 6.7,     // 睡前目标下限（预防夜间低血糖）
+    exerciseMinBG: 5.6,      // 运动前最低血糖（低于此需先加餐）
+    exerciseMaxBG: 13.9,     // 运动前最高血糖（高于此暂缓运动）
+    preCarbG: 20,            // 运动前加餐碳水（克）
+    hypoCarbG: 15,           // 低血糖处理碳水（克）
+    postMealExerciseMin: 60, // 建议餐后开始运动时间（分钟，自第一口饭算）
+    postMealExerciseRange: [45, 90],
+    monitorAfterExerciseMin: 30,
+    nightCheckHour: 2
+  };
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function r1(v) { return Math.round(v * 10) / 10; }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function hhmm(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function addMin(d, m) { return new Date(d.getTime() + m * 60000); }
+
+  /* ------------------------------------------------------------ 血糖分级 */
+  function classify(bg, phase, rules) {
+    rules = rules || DEFAULT_RULES;
+    var lvl;
+    if (bg < rules.hypoSerious) lvl = { key: 'severe_hypo', label: '严重低血糖', color: 'danger' };
+    else if (bg < rules.hypoLow) lvl = { key: 'hypo', label: '低血糖', color: 'danger' };
+    else if (bg < rules.exerciseMinBG) lvl = { key: 'low_normal', label: '偏低（尚在目标内）', color: 'warn' };
+    else if (bg <= rules.preMealIdealHigh + 0.8) lvl = { key: 'in_range', label: '目标范围内', color: 'ok' };
+    else if (bg <= rules.slightlyHigh) lvl = { key: 'slightly_high', label: '略高于目标', color: 'warn' };
+    else if (bg < rules.veryHigh) lvl = { key: 'high', label: '偏高', color: 'warn' };
+    else lvl = { key: 'very_high', label: '很高（需立即处理）', color: 'danger' };
+
+    var target = '空腹/餐前 4.4～7.0，餐后 2 h <10.0 mmol/L';
+    if (phase === 'post1') target = '餐后 1 h 一般 <10.0～11.1 mmol/L';
+    else if (phase === 'post2') target = '餐后 2 h <10.0 mmol/L';
+    else if (phase === 'bed') target = '睡前 6.7～10.0 mmol/L（<6.7 需加餐预防夜间低血糖）';
+    else if (phase === 'night') target = '夜间 4.4～7.8 mmol/L，<3.9 为夜间低血糖';
+    else if (phase === 'fasting') target = '空腹 4.4～7.0 mmol/L';
+    else if (phase === 'exercise_pre') target = '运动前 5.6～13.9 mmol/L';
+    lvl.target = target;
+    return lvl;
+  }
+
+  /* ------------------------------------------------------- 运动处方规则 */
+  function exercisePlan(input, rules) {
+    var bg = input.bg, ketone = input.ketone || 'unknown';
+    var cor = input.profile && input.profile.comorb ? input.profile.comorb : {};
+    var treat = (input.profile && input.profile.treat) || 'lifestyle';
+    var hypoRisk = ['oral_high', 'basal', 'mdi', 'premix', 'pump'].indexOf(treat) >= 0;
+    var cautions = [], blocked = [], allowed = true;
+
+    if (ketone === 'pos') { allowed = false; blocked.push('酮体阳性：运动会使血糖与酮体进一步升高，存在酮症酸中毒风险，禁止运动，请立即联系医生。'); }
+    if (bg < rules.hypoLow) { allowed = false; blocked.push('血糖 <3.9 mmol/L：先纠正低血糖，暂缓运动。'); }
+    else if (bg < rules.exerciseMinBG) {
+      blocked.push('血糖 3.9～5.6 mmol/L：运动前需先补充约 ' + rules.preCarbG + ' g 碳水（如 1 份水果 + 2～3 块苏打饼干或 200 ml 牛奶），15 分钟后复测 ≥5.6 再运动。');
+    }
+    if (bg > rules.dkaWarn) { allowed = false; blocked.push('血糖 >16.7 mmol/L：暂缓运动，检查酮体、补充水分并按医嘱调整用药。'); }
+    else if (bg > rules.exerciseMaxBG) {
+      if (ketone === 'neg') blocked.push('血糖 >13.9 mmol/L（酮体阴性）：暂缓中高强度运动，可先按医嘱纠正高血糖；确需活动时仅限 10～20 分钟低强度步行。');
+      else blocked.push('血糖 >13.9 mmol/L 且酮体未测：暂缓运动，先测酮体。');
+      allowed = false;
+    }
+    if (cor.gp) cautions.push('合并胃轻瘫：避免餐后立即弯腰、跳跃等动作，运动宜在餐后 60～90 分钟开始。');
+    if (input.profile && input.profile.ckd === 'ckd45') cautions.push('CKD 4～5 期：从低强度、短时间开始，避免脱水与高钾风险。');
+
+    var intensity = input.exIntensity || 'mod';
+    var minutes = +input.exMin || 30;
+    var reason = '';
+    if (bg > rules.slightlyHigh && bg <= rules.exerciseMaxBG) {
+      if (intensity === 'high' || intensity === 'hiit') {
+        intensity = 'mod';
+        reason = '血糖偏高（10.0～13.9 mmol/L）：高强度运动可能使血糖进一步升高，改为中等强度有氧。';
+      }
+      minutes = clamp(minutes, 20, 40);
+    } else if (bg >= rules.exerciseMinBG && bg <= rules.slightlyHigh) {
+      reason = '血糖在目标范围：可按计划进行中等强度有氧运动。';
+      minutes = clamp(minutes, 25, 60);
+    } else if (bg < rules.exerciseMinBG && bg >= rules.hypoLow) {
+      intensity = intensity === 'hiit' ? 'low' : (intensity === 'high' ? 'mod' : intensity);
+      reason = '血糖偏低：先加餐，再以低～中等强度开始，运动中每 30 分钟复测。';
+      minutes = clamp(minutes, 20, 40);
+    }
+
+    var startDelay = rules.postMealExerciseMin;
+    if (bg > rules.slightlyHigh) startDelay = 45;
+    if (input.next === 'exercise') startDelay = 0;   // 本次就是运动前的评估
+
+    var monitor = [
+      { offset: 0, label: '运动前：即刻复测（' + (bg < rules.exerciseMinBG ? '加餐后 15 分钟' : '运动开始前') + '）' },
+      { offset: minutes, label: '运动后即刻' },
+      { offset: minutes + rules.monitorAfterExerciseMin, label: '运动后 30 分钟' },
+      { offset: -1, label: '睡前（若运动在下午/傍晚）' }
+    ];
+    if (intensity === 'high' || intensity === 'hiit' || minutes >= 60) {
+      monitor.push({ offset: -2, label: '运动后夜间 ' + pad(rules.nightCheckHour) + ':00～3:00 加测一次（延迟性低血糖风险）' });
+      cautions.push('较长时间/较大强度运动后 12～24 小时仍可能发生延迟性低血糖' + (hypoRisk ? '（你正在使用可能引起低血糖的药物）' : '') + '，建议睡前血糖 <7.0 mmol/L 时加餐 15～20 g 慢吸收碳水。');
+    }
+    if (hypoRisk) cautions.push('使用胰岛素或促泌剂：运动前后务必监测血糖，随身携带糖果/葡萄糖片与身份卡；不要自行增减药量，按医嘱执行。');
+    if (bg < rules.sleepTargetLow && (input.next === 'sleep' || input.phase === 'bed')) {
+      cautions.push('睡前血糖 <6.7～7.0 mmol/L：建议加餐 15～20 g 慢吸收碳水（如 200 ml 牛奶 + 1 小把坚果），预防夜间低血糖。');
+    }
+    cautions.push('运动禁忌与暂停指征：血糖 >13.9 mmol/L 或酮体阳性、急性感染、严重心脑血管事件急性期、足部溃疡、增殖期视网膜病变（避免剧烈与抗阻运动）、运动中胸痛/头晕/气促立即停止。');
+
+    return {
+      allowed: allowed, reason: reason, blockReasons: blocked, cautions: cautions,
+      startAfterMealMin: startDelay, intensity: intensity, minutes: minutes,
+      intensityLabel: { low: '低强度（散步、家务、太极）', mod: '中等强度（快走 100 步/分、慢跑、骑车、游泳、广场舞）', high: '较大强度（跑步、球类、跳绳、抗阻训练）', hiit: '高强度间歇' }[intensity] || intensity,
+      preCarbG: bg < rules.exerciseMinBG ? rules.preCarbG : 0,
+      monitor: monitor,
+      weekly: '每周累计 ≥150 分钟中等强度有氧运动，分 3～5 天完成；每周 2～3 次抗阻训练（隔天进行），可增加肌肉量与胰岛素敏感性。'
+    };
+  }
+
+  /* --------------------------------------------------------- 主评估函数 */
+  function assess(input, rules) {
+    rules = Object.assign({}, DEFAULT_RULES, rules || {});
+    var bg = +input.bg;
+    var trend = input.trend || 'flat';
+    var phase = input.phase || 'premeal';
+    var now = input.now ? new Date(input.now) : new Date();
+    var lvl = classify(bg, phase, rules);
+    var treat = (input.profile && input.profile.treat) || 'lifestyle';
+    var hypoRisk = ['oral_high', 'basal', 'mdi', 'premix', 'pump'].indexOf(treat) >= 0;
+    var actions = [], mealNotes = [], warnings = [];
+
+    /* ① 立即处理 */
+    if (bg < rules.hypoSerious) {
+      actions.push({ kind: 'carb', title: '立即处理严重低血糖（' + bg + ' mmol/L）', detail: '立即口服 15～20 g 快速吸收碳水（葡萄糖片 3～4 片 / 含糖饮料 150～200 ml / 蜂蜜 1 汤匙），15 分钟后复测；若仍 <3.9 重复一次。若出现意识模糊、抽搐、无法吞咽，禁止喂食，立即拨打急救电话并使用胰高血糖素（如有）。' });
+      warnings.push('严重低血糖属于急症，处理后须联系医生查找原因并调整方案。');
+    } else if (bg < rules.hypoLow) {
+      actions.push({ kind: 'carb', title: '立即纠正低血糖（' + bg + ' mmol/L）', detail: '口服 ' + rules.hypoCarbG + ' g 快速碳水（葡萄糖片 3 片或果汁 150 ml 或方糖 3 块），静坐休息，15 分钟后复测；回升到 ≥3.9 mmol/L 再进正餐或运动。不要用巧克力、冰淇淋代替（脂肪延缓吸收）。' });
+      if (hypoRisk) warnings.push('正在使用胰岛素或促泌剂：低血糖后 24 小时内易再次发生，建议与医生沟通是否需调整剂量。');
+    } else if (bg < rules.exerciseMinBG && (input.next === 'exercise' || phase === 'exercise_pre')) {
+      actions.push({ kind: 'carb', title: '运动前加餐', detail: '血糖 ' + bg + ' mmol/L 偏低，先补充约 ' + rules.preCarbG + ' g 碳水（1 份水果 + 200 ml 牛奶，或 2 片全麦面包），15 分钟后复测 ≥5.6 mmol/L 再开始运动。' });
+    }
+
+    /* ② 进餐时间 */
+    var delayMin = 0, delayReason = '';
+    if (bg < rules.hypoLow) { delayMin = 20; delayReason = '先补糖 15 g、15 分钟后复测，血糖回升到 3.9 mmol/L 以上再进餐（正餐可延后约 20 分钟）。'; }
+    else if (bg < rules.exerciseMinBG && input.next === 'meal') { delayMin = 0; delayReason = '血糖偏低但可直接进餐，不要为“等血糖升上来”而推迟进餐；主食不必减少，建议先吃主食再吃菜。'; }
+    else if (bg <= rules.slightlyHigh) { delayMin = 0; delayReason = '血糖在目标范围，按计划时间进餐即可。'; }
+    else if (bg < rules.veryHigh) {
+      delayMin = 15;
+      delayReason = '血糖偏高：可先做 10～15 分钟低强度活动（如慢走），再进餐；同时把进餐顺序改为「蔬菜 → 蛋白质 → 主食」，可降低餐后血糖峰值。';
+      if (hypoRisk) delayReason += ' 使用胰岛素者请按医嘱安排注射与进餐间隔（通常餐前 15～30 分钟注射速效胰岛素），不要为等血糖而降糖而延误进餐。';
+    } else {
+      delayMin = 0;
+      delayReason = '血糖很高时不建议用“不吃饭”来降糖（尤其使用胰岛素者易发生低血糖与酮症）；应先补液、按医嘱处理高血糖，同时按下方调整进餐量与种类。';
+    }
+
+    /* ③ 主食量与种类 */
+    var carbFactor = 1.0, factorNote = [];
+    if (lvl.key === 'severe_hypo' || lvl.key === 'hypo') { carbFactor = 1.05; factorNote.push('低血糖处理后进餐：主食可略增（约 1 份，含 20 g 碳水），并在下一餐前复测。'); }
+    else if (lvl.key === 'low_normal') { carbFactor = 1.0; factorNote.push('血糖偏低：主食不减量，可把水果/乳类加餐提前。'); }
+    else if (lvl.key === 'in_range') { carbFactor = 1.0; }
+    else if (lvl.key === 'slightly_high') { carbFactor = 0.9; factorNote.push('略高：下一餐主食减少约 10%（每 2 份主食减 0.2 份，即约 15 g 米饭）。'); }
+    else if (lvl.key === 'high') { carbFactor = 0.75; factorNote.push('偏高：下一餐主食减少 20%～30%，同时增加非淀粉类蔬菜 100～200 g 与优质蛋白，保证饱腹感与营养。'); }
+    else { carbFactor = 0.6; factorNote.push('很高：主食减少约 30%～40%，以蔬菜、菌藻、豆制品、鱼虾、蛋类补足能量；不要自行停用降糖药或胰岛素。'); }
+
+    if ((trend === 'up3' || trend === 'up2') && bg > rules.slightlyHigh - 2) {
+      carbFactor *= 0.9;
+      factorNote.push('血糖正在上升（' + (trend === 'up3' ? '↑↑' : '↑') + '）：主食在上述基础上再减约 10%，优先选择 GI <55 的主食。');
+    }
+    if (trend === 'down2' || trend === 'down3') {
+      carbFactor = Math.min(1.15, carbFactor * 1.15);
+      factorNote.push('血糖正在下降（' + (trend === 'down3' ? '↓↓' : '↓') + '）：主食不再减量，并在 30～60 分钟后复测，警惕低血糖。');
+    }
+    var needLowGI = bg >= rules.slightlyHigh - 1 || trend === 'up2' || trend === 'up3';
+    if (needLowGI) factorNote.push('种类调整：把白米饭、白粥、馒头、烙饼等换成杂粮饭（糙米/黑米/燕麦/荞麦/藜麦）、玉米、薯类等低 GI 主食；避免粥类与糊化主食。');
+
+    /* ④ 加餐建议 */
+    var snackTip = '';
+    if (bg >= rules.veryHigh) snackTip = '暂不加餐（除低血糖处理外）；如需加餐只选黄瓜、番茄等低能量蔬菜。';
+    else if (bg >= rules.slightlyHigh) snackTip = '加餐选低 GL 水果 100 g（苹果、梨、柚、草莓）或 200 ml 无糖牛奶，避免果汁、果干与甜点。';
+    else if (bg < rules.exerciseMinBG) snackTip = '可加餐 1 份水果 + 200 ml 牛奶（约 20～25 g 碳水），并计入全天总能量。';
+    else snackTip = '按计划加餐：水果 100～200 g 配少量坚果（10 g），或 200 ml 无糖酸奶，放在两餐之间。';
+
+    /* ⑤ 运动处方 */
+    var ex = exercisePlan({ bg: bg, ketone: input.ketone, exIntensity: input.exIntensity, exMin: input.exMin, next: input.next, phase: phase, profile: input.profile }, rules);
+
+    /* ⑥ 复测与时间轴 */
+    var rechecks = [];
+    if (bg < rules.hypoLow) rechecks.push({ afterMin: 15, label: '低血糖处理后 15 分钟复测（未达标每 15 分钟重复）' });
+    if (bg >= rules.veryHigh) {
+      rechecks.push({ afterMin: 60, label: '1 小时后复测血糖与酮体（若酮体阳性立即就医）' });
+      warnings.push('血糖 ≥13.9～16.7 mmol/L：请检查酮体、多饮水，并按医嘱处理；若出现恶心呕吐、腹痛、呼吸深快、意识改变，立即就医。');
+    }
+    if (input.next === 'meal') rechecks.push({ afterMin: delayMin + 120, label: '餐后 2 小时血糖（评估本餐碳水与用药匹配）' });
+    if (input.next === 'exercise') {
+      rechecks.push({ afterMin: ex.minutes, label: '运动后即刻血糖' });
+      rechecks.push({ afterMin: ex.minutes + 30, label: '运动后 30 分钟血糖' });
+    }
+    if (input.next === 'sleep') rechecks.push({ afterMin: 0, label: '睡前血糖，必要时加餐后再睡' });
+
+    var summary;
+    if (lvl.key === 'severe_hypo' || lvl.key === 'hypo') summary = '当前血糖 ' + bg + ' mmol/L 属于低血糖，优先纠正低血糖，其次才是进餐与运动安排。';
+    else if (lvl.key === 'low_normal') summary = '当前血糖 ' + bg + ' mmol/L 偏低但在目标内，重点是避免继续下降（先加餐/正常进餐，暂缓运动）。';
+    else if (lvl.key === 'in_range') summary = '当前血糖 ' + bg + ' mmol/L 在目标范围，可按原计划进餐与运动，维持现有节奏。';
+    else if (lvl.key === 'slightly_high') summary = '当前血糖 ' + bg + ' mmol/L 略高于目标，主食略减、优选低 GI，餐后 45～60 分钟开始运动。';
+    else if (lvl.key === 'high') summary = '当前血糖 ' + bg + ' mmol/L 偏高，主食减少 20%～30%、增加蔬菜与蛋白，餐后 45 分钟开始中等强度运动，1～2 小时后复测。';
+    else summary = '当前血糖 ' + bg + ' mmol/L 很高，暂缓运动、检查酮体、补液并按医嘱处理，同时显著减少主食并增加低 GL 食物。';
+
+    return {
+      time: hhmm(now), bg: bg, trend: trend, phase: phase, level: lvl,
+      summary: summary, actions: actions, warnings: warnings,
+      meal: { delayMin: delayMin, reason: delayReason, carbFactor: r1(carbFactor), notes: factorNote, needLowGI: needLowGI, snackTip: snackTip, order: '建议进餐顺序：先吃蔬菜（约 5 分钟）→ 再吃蛋白质（肉/蛋/豆）→ 最后吃主食，全程细嚼慢咽 20 分钟以上。' },
+      exercise: ex,
+      rechecks: rechecks,
+      hypoRisk: hypoRisk,
+      rules: rules
+    };
+  }
+
+  /* ------------------------------------------------------------ 时间轴 */
+  /** 生成时间轴事件（相对当前时间与各餐时间） */
+  function buildTimeline(now, meals, ex, result) {
+    var ev = [];
+    var d0 = new Date(now);
+    (meals || []).forEach(function (m) {
+      var t = m.time || '';
+      var hm = /^(\d{1,2}):(\d{2})$/.exec(t);
+      if (!hm) return;
+      var d = new Date(d0); d.setHours(+hm[1], +hm[2], 0, 0);
+      var kind = /加餐/.test(m.label) ? 'snack' : 'meal';
+      ev.push({ at: d, kind: kind, label: m.label + ' ' + t, detail: '交换份：' + Object.keys(m.byCat || {}).filter(function (c) { return m.byCat[c] > 0; }).map(function (c) { return (global.CAT_META && global.CAT_META[c] ? global.CAT_META[c].label : c) + ' ' + m.byCat[c] + ' 份'; }).join('、') });
+    });
+    if (ex && ex.allowed) {
+      // 运动：安排在最近一餐之后
+      var lastMeal = null;
+      ev.forEach(function (e) { if (e.kind === 'meal' && e.at <= d0) lastMeal = e; });
+      var base = lastMeal ? lastMeal.at : d0;
+      var start = addMin(base, ex.startAfterMealMin);
+      if (start < d0) start = addMin(d0, 10);
+      ev.push({ at: start, kind: 'exercise', label: '运动建议开始 ' + hhmm(start), detail: ex.intensityLabel + '，' + ex.minutes + ' 分钟' + (ex.preCarbG ? '（运动前需加餐 ' + ex.preCarbG + ' g 碳水）' : '') });
+      ev.push({ at: addMin(start, ex.minutes), kind: 'monitor', label: '运动后即刻测血糖', detail: '必要时 30 分钟后再测一次' });
+    }
+    (result && result.rechecks ? result.rechecks : []).forEach(function (r) {
+      if (r.afterMin > 0) ev.push({ at: addMin(d0, r.afterMin), kind: 'monitor', label: r.label, detail: '' });
+    });
+    if (result && result.actions) {
+      result.actions.forEach(function (a) {
+        if (a.kind === 'carb') ev.push({ at: d0, kind: 'carb', label: '立即：' + a.title, detail: a.detail });
+      });
+    }
+    ev.sort(function (a, b) { return a.at - b.at; });
+    return ev;
+  }
+
+  /* -------------------------------------------------- CGM / 连续血糖统计 */
+  /** readings: [{t: Date|string, v: number}] */
+  function analyzeCGM(readings, rules) {
+    rules = Object.assign({}, DEFAULT_RULES, rules || {});
+    var rs = (readings || []).map(function (r) {
+      var raw = r.t, d;
+      if (raw instanceof Date) d = raw;
+      else {
+        var s = String(raw).trim();
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {          // 只有时间（如 07:30），补上今天日期
+          d = new Date();
+          var hm = s.split(':');
+          d.setHours(+hm[0], +hm[1], 0, 0);
+        } else {
+          d = new Date(s.replace(/-/g, '/'));
+        }
+      }
+      return { t: d, v: +r.v };
+    }).filter(function (r) { return !isNaN(r.t.getTime()) && !isNaN(r.v) && r.v > 0; })
+      .sort(function (a, b) { return a.t - b.t; });
+    if (!rs.length) return null;
+
+    var vals = rs.map(function (r) { return r.v; });
+    var n = vals.length;
+    var mean = vals.reduce(function (a, b) { return a + b; }, 0) / n;
+    var sd = Math.sqrt(vals.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / Math.max(1, n - 1));
+    var meanMgdl = mean * 18.0182;
+    var gmi = 3.31 + 0.02392 * meanMgdl;
+
+    function pct(f) { return r1(vals.filter(f).length / n * 100); }
+    var tir = pct(function (v) { return v >= rules.targetLow && v <= rules.targetHigh; });
+    var tbr = pct(function (v) { return v < rules.targetLow; });
+    var tbr2 = pct(function (v) { return v < rules.hypoSerious; });
+    var tar = pct(function (v) { return v > rules.targetHigh; });
+    var tar2 = pct(function (v) { return v > rules.veryHigh; });
+    var tirTight = pct(function (v) { return v >= 3.9 && v <= 7.8; });
+
+    // 低血糖事件：连续 ≤3.9 且持续 ≥15 分钟
+    var events = [], cur = null;
+    rs.forEach(function (r) {
+      if (r.v < rules.targetLow) {
+        if (!cur) cur = { from: r.t, to: r.t, min: r.v };
+        else { cur.to = r.t; cur.min = Math.min(cur.min, r.v); }
+      } else if (cur) {
+        if ((cur.to - cur.from) / 60000 >= 15) events.push(cur);
+        cur = null;
+      }
+    });
+    if (cur && (cur.to - cur.from) / 60000 >= 15) events.push(cur);
+
+    var tirLowCount = 0;
+    for (var i = 1; i < n; i++) if (vals[i] >= rules.targetLow && vals[i] <= rules.targetHigh && vals[i - 1] >= rules.targetLow && vals[i - 1] <= rules.targetHigh) tirLowCount++;
+
+    var flags = [];
+    if (tir < 70) flags.push({ level: 'warn', text: '目标范围内时间（TIR 3.9～10.0）为 ' + tir + '%，低于 70% 的常用目标，建议从餐后血糖与主食结构入手调整。' });
+    if (tbr > 4) flags.push({ level: 'danger', text: '低于目标范围时间（TBR）为 ' + tbr + '%，超过 4%，提示低血糖风险较高，需优先调整降糖方案（联系医生）。' });
+    if (tbr2 > 1) flags.push({ level: 'danger', text: '严重低血糖时间占比 ' + tbr2 + '%（>1%），属于高风险，请尽快联系医生。' });
+    if (tar > 25) flags.push({ level: 'warn', text: '高于目标范围时间（TAR）为 ' + tar + '%，餐后血糖管理有较大改善空间。' });
+    if (sd / mean > 0.36) flags.push({ level: 'warn', text: '血糖变异系数 CV 为 ' + r1(sd / mean * 100) + '%，高于 36%，血糖波动偏大，建议规律进餐时间与碳水分配。' });
+    if (events.length) flags.push({ level: 'danger', text: '检测到 ' + events.length + ' 次持续 ≥15 分钟的低血糖事件，最低 ' + r1(Math.min.apply(null, events.map(function (e) { return e.min; }))) + ' mmol/L。' });
+
+    return {
+      n: n, from: rs[0].t, to: rs[n - 1].t,
+      mean: r1(mean), sd: r1(sd), cv: r1(sd / mean * 100), gmi: r1(gmi),
+      max: r1(Math.max.apply(null, vals)), min: r1(Math.min.apply(null, vals)),
+      tir: tir, tirTight: tirTight, tbr: tbr, tbr2: tbr2, tar: tar, tar2: tar2,
+      hypoEvents: events, flags: flags, readings: rs
+    };
+  }
+
+  /** 解析粘贴的文本/CSV：返回 readings */
+  function parseReadings(text) {
+    var out = [], bad = 0;
+    (text || '').split(/\r?\n/).forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      var parts = line.split(/[,;\t ]+/).filter(function (s) { return s !== ''; });
+      // 找到日期/时间列与数值列：取第一个形如时间的字段与第一个 0.5～40 的数值
+      var tStr = null, v = null, dateStr = null;
+      parts.forEach(function (p) {
+        if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(p)) { dateStr = p; return; }
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(p)) { tStr = p; return; }
+        var num = parseFloat(p.replace(/[^\d.\-]/g, ''));
+        if (v == null && !isNaN(num) && num > 0.5 && num < 40) v = num;
+      });
+      if (v == null) { bad++; return; }
+      var d;
+      if (dateStr && tStr) d = new Date((dateStr + ' ' + tStr).replace(/-/g, '/'));
+      else if (dateStr) d = new Date(dateStr.replace(/-/g, '/'));
+      else if (tStr) { d = new Date(); var hm = tStr.split(':'); d.setHours(+hm[0], +hm[1], 0, 0); }
+      else { d = new Date(); }
+      if (isNaN(d.getTime())) { bad++; return; }
+      out.push({ t: d, v: v });
+    });
+    return { readings: out, skipped: bad };
+  }
+
+  global.GlucoseEngine = {
+    DEFAULT_RULES: DEFAULT_RULES,
+    classify: classify,
+    assess: assess,
+    exercisePlan: exercisePlan,
+    buildTimeline: buildTimeline,
+    analyzeCGM: analyzeCGM,
+    parseReadings: parseReadings,
+    hhmm: hhmm, addMin: addMin, r1: r1
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/* ==== app.js ==== */
+/* =====================================================================
+ * app.js —— 界面逻辑（原生 JS，无框架、无外部依赖）
+ *   ① 基础数据 → 处方    ② 配餐模板与营养    ③ 食材平替
+ *   ④ 血糖 · 运动联动    ⑤ 数据与设置
+ * ===================================================================== */
+(function () {
+  'use strict';
+
+  var P = window.PrescEngine;
+  var G = window.GlucoseEngine;
+  var LS_KEY = 'dm_nutrition_workbench_v1';
+  var LS_DB = 'dm_nutrition_fooddb_v1';
+  var LS_RULES = 'dm_nutrition_rules_v1';
+
+  var state = {
+    patientId: '',
+    profile: {
+      name: '', sex: 'male', age: 55, height: 170, weight: 75, activity: 'light',
+      type: 't2', treat: 'oral_low', gest: 'no', ckd: 'normal', goal: 'maintain',
+      comorb: { htn: true, lipid: false, gout: false, gp: false }
+    },
+    opts: { preset: 'three_snack', flavor: 'cn', mealPct: null },
+    rx: null, plan: null, day: null, checks: [], manual: {},
+    rules: Object.assign({}, G.DEFAULT_RULES),
+    swapFrom: null, pendingSwap: null, cgm: null, glucose: null
+  };
+
+  /* ----------------------------------------------------------- 工具函数 */
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+  function n(v, d) { return (v == null || isNaN(v)) ? '—' : (+v).toFixed(d == null ? 0 : d); }
+  function r1(v) { return Math.round(v * 10) / 10; }
+  function catLabel(c) { return (P.CAT_META[c] || {}).label || c; }
+  function portionText(it) {
+    var f = it.food, g = it.grams, out = [];
+    var u = f.unitG ? g / f.unitG : 0;
+    var unitShort = String(f.unitName || '').replace(/^1\s*/, '').replace(/（.*?）/, '').trim();
+    if (u >= 0.85 && u <= 1.15) out.push('约 1 ' + unitShort);
+    else if (u >= 1.85 && u <= 2.15) out.push('约 2 ' + unitShort);
+    else if (u >= 2.85 && u <= 3.15) out.push('约 3 ' + unitShort);
+    out.push('约 ' + r1(g / 50) + ' 两');
+    if (it.dry) out.unshift('生重');
+    return out.join('，');
+  }
+  function glText(f, grams) {
+    if (f.gi == null) return '—';
+    return n(f.gi * f.cho * grams / 10000, 1);
+  }
+  function giText(f) { return f.gi == null ? '未收录' : (n(f.gi, f.gi < 20 ? 1 : 0) + (f.giEst ? '≈' : '')); }
+  function badge(text, cls) { return '<span class="badge ' + (cls || '') + '">' + esc(text) + '</span>'; }
+
+  /* ------------------------------------------------------- ① 基础数据 */
+  function readProfile() {
+    var p = state.profile;
+    p.name = $('pName').value.trim();
+    p.sex = $('pSex').value;
+    p.age = +$('pAge').value || 0;
+    p.height = +$('pHeight').value || 0;
+    p.weight = +$('pWeight').value || 0;
+    p.activity = $('pActivity').value;
+    p.type = $('pType').value;
+    p.treat = $('pTreat').value;
+    p.gest = $('pGest').value;
+    p.ckd = $('pCkd').value;
+    p.goal = $('pGoal').value;
+    p.comorb = {
+      htn: $('pComorbHtn').checked, lipid: $('pComorbLip').checked,
+      gout: $('pComorbGout').checked, gp: $('pComorbGp').checked
+    };
+    state.patientId = $('ptId').value.trim();
+    return p;
+  }
+  function fillProfileForm() {
+    var p = state.profile;
+    $('ptId').value = state.patientId || '';
+    $('pName').value = p.name || '';
+    $('pSex').value = p.sex; $('pAge').value = p.age; $('pHeight').value = p.height; $('pWeight').value = p.weight;
+    $('pActivity').value = p.activity; $('pType').value = p.type; $('pTreat').value = p.treat;
+    $('pGest').value = p.gest; $('pCkd').value = p.ckd; $('pGoal').value = p.goal;
+    $('pComorbHtn').checked = !!p.comorb.htn; $('pComorbLip').checked = !!p.comorb.lipid;
+    $('pComorbGout').checked = !!p.comorb.gout; $('pComorbGp').checked = !!p.comorb.gp;
+  }
+
+  function computeRx() {
+    var p = readProfile();
+    var rx = P.computePrescription({
+      height: p.height, weight: p.weight, age: p.age, sex: p.sex, activity: p.activity,
+      type: p.type, treat: p.treat, gest: p.gest, ckd: p.ckd, goal: p.goal,
+      choPct: state.manual.choPct, fatPct: state.manual.fatPct
+    });
+    // 手工覆盖
+    if (state.manual.energy) { rx.energy = Math.round(state.manual.energy); }
+    if (state.manual.choPct) rx.choPct = +state.manual.choPct;
+    if (state.manual.fatPct) rx.fatPct = +state.manual.fatPct;
+    if (state.manual.proPerKg) { rx.proPerKg = +state.manual.proPerKg; }
+    if (state.manual.fiber) rx.fiberG = +state.manual.fiber;
+    rx.choG = Math.round(rx.energy * rx.choPct / 100 / 4);
+    rx.proG = Math.round(rx.ibw * rx.proPerKg);
+    rx.proPct = r1(rx.proG * 4 / rx.energy * 100);
+    rx.fatPct = (state.manual.fatPct != null) ? +state.manual.fatPct : r1(100 - rx.choPct - rx.proPct);
+    rx.fatG = Math.round(rx.energy * rx.fatPct / 100 / 9);
+    state.rx = rx;
+    return rx;
+  }
+
+  function renderProfile() {
+    var rx = computeRx();
+    var p = state.profile;
+    $('calcBadge').textContent = rx.bodyTypeLabel + ' · ' + rx.coef + ' kcal/kg';
+    $('calcBadge').className = 'badge ' + (rx.bodyType === 'normal' ? 'ok' : 'warn');
+    $('profileOut').innerHTML = [
+      ['理想体重', n(rx.ibw, 1) + ' kg', 'Broca 改良公式：身高(cm) − 105'],
+      ['BMI', n(rx.bmi, 1) + ' kg/m²', '中国标准：<18.5 消瘦 / 18.5～23.9 正常 / 24～27.9 超重 / ≥28 肥胖'],
+      ['每日能量', n(rx.energy) + ' kcal', rx.coef + ' kcal/kg 理想体重 × ' + rx.bodyTypeLabel],
+      ['碳水化合物', n(rx.choG) + ' g', rx.choPct + '%E（指南 45%～60%）'],
+      ['蛋白质', n(rx.proG) + ' g', rx.proKg !== undefined ? '' : rx.proPerKg + ' g/kg（可接受 ' + rx.proRangeG[0] + '～' + rx.proRangeG[1] + ' g）'],
+      ['脂肪', n(rx.fatG) + ' g', rx.fatPct + '%E（建议 20%～30%）'],
+      ['膳食纤维', n(rx.fiberG) + ' g', '按 14 g/1000 kcal 折算'],
+      ['交换份总量', n(rx.exchTotal, 1) + ' 份', '1 交换份 = 90 kcal']
+    ].map(function (row) {
+      return '<div class="item"><span>' + esc(row[0]) + '</span><b>' + esc(row[1]) + '</b><span>' + esc(row[2] || '') + '</span></div>';
+    }).join('');
+
+    if (document.activeElement !== $('mEnergy')) $('mEnergy').value = rx.energy;
+    if (document.activeElement !== $('mChoPct')) $('mChoPct').value = rx.choPct;
+    if (document.activeElement !== $('mProPerKg')) $('mProPerKg').value = rx.proPerKg;
+    if (document.activeElement !== $('mFatPct')) $('mFatPct').value = rx.fatPct;
+    if (document.activeElement !== $('mFiber')) $('mFiber').value = rx.fiberG;
+
+    $('macroTbl').innerHTML = '<thead><tr><th>营养素</th><th class="num">目标量</th><th class="num">供能比</th><th>说明</th></tr></thead><tbody>' +
+      [['能量', n(rx.energy) + ' kcal', '—', '按理想体重 × 活动系数'],
+       ['碳水化合物', n(rx.choG) + ' g', rx.choPct + '%', '优选低 GI、全谷杂豆 ≥1/3'],
+       ['蛋白质', n(rx.proG) + ' g', rx.proPct + '%', '优质蛋白 ≥50%，分散到各餐'],
+       ['脂肪', n(rx.fatG) + ' g', rx.fatPct + '%', '饱和脂肪 <7%E，烹调油 25～30 g'],
+       ['膳食纤维', n(rx.fiberG) + ' g', '—', '全谷、蔬菜、豆类、坚果']
+      ].map(function (r) { return '<tr><td>' + r[0] + '</td><td class="num">' + r[1] + '</td><td class="num">' + r[2] + '</td><td class="hint">' + r[3] + '</td></tr>'; }).join('') +
+      '</tbody>';
+
+    $('macroWarn').innerHTML = (rx.warnings || []).map(function (w) { return '· ' + esc(w); }).join('<br>');
+  }
+
+  /* ------------------------------------------------------- ② 配餐模板 */
+  function readMealPct() {
+    var preset = $('mealPreset').value;
+    if (preset === 'custom') {
+      var out = {};
+      document.querySelectorAll('#mealPctBox input[data-meal]').forEach(function (inp) {
+        out[inp.getAttribute('data-meal')] = (+inp.value || 0) / 100;
+      });
+      return Object.keys(out).length ? out : null;
+    }
+    return null;
+  }
+
+  function renderMealPctBox() {
+    var preset = $('mealPreset').value;
+    var meals = (P.PRESETS[preset] || P.PRESETS.three_snack).meals;
+    if (state.opts.mealPct && preset === 'custom') meals = state.opts.mealPct;
+    var box = $('mealPctBox');
+    box.innerHTML = '<div class="row wrap" style="align-items:flex-end">' + Object.keys(meals).map(function (k) {
+      var def = P.MEAL_DEF[k] || {};
+      return '<label>' + esc(def.label || k) + '（' + esc(def.time || '') + '）%' +
+        '<input type="number" min="0" max="60" step="1" data-meal="' + k + '" value="' + Math.round(meals[k] * 100) + '" ' +
+        (preset === 'custom' ? '' : 'readonly') + '></label>';
+    }).join('') + '</div>' +
+      (preset === 'custom' ? '<p class="hint">自定义模式：可直接修改各餐百分比，合计应为 100%（程序会按比例归一）。</p>'
+        : '<p class="hint">选择「自定义」后可修改各餐百分比。</p>');
+  }
+
+  function generatePlan(silent) {
+    var rx = computeRx();
+    var opts = {
+      preset: $('mealPreset').value === 'custom' ? 'three_snack' : $('mealPreset').value,
+      flavor: $('flavorPref').value,
+      profile: state.profile,
+      mealPct: readMealPct(),
+      lowGIPrefer: $('flavorPref').value === 'lowgi'
+    };
+    // 主食分配策略微调
+    var strat = $('carbStrategy').value;
+    if (strat === 'front' || strat === 'back') {
+      var base = Object.assign({}, (P.PRESETS[opts.preset] || P.PRESETS.three_snack).meals);
+      var keys = Object.keys(base);
+      if (keys.length) {
+        var adj = strat === 'front' ? 0.03 : -0.03;
+        base[keys[0]] = Math.max(0.05, base[keys[0]] + adj);
+        var last = keys.filter(function (k) { return !/加餐/.test((P.MEAL_DEF[k] || {}).label || ''); }).pop() || keys[keys.length - 1];
+        base[last] = Math.max(0.05, base[last] - adj);
+        opts.mealPct = base;
+      }
+    }
+    if (opts.preset === 'gastroparesis') opts.preset = 'gastroparesis';
+    var res = P.buildDay(rx, opts);
+    state.opts = { preset: opts.preset, flavor: opts.flavor, mealPct: opts.mealPct };
+    state.plan = res.plan;
+    state.day = res.day;
+    state.checks = res.checks;
+    state.iterations = res.iterations;
+    state.rx = rx;
+    renderPlan();
+    if (!silent) renderAdjustedPlan();
+  }
+
+  function renderPlan() {
+    var plan = state.plan, rx = state.rx, day = state.day;
+    if (!plan) return;
+    var html = '';
+    plan.meals.forEach(function (m, mi) {
+      var rows = m.items.map(function (it, ii) {
+        var f = it.food;
+        return '<tr>' +
+          '<td>' + esc(f.name) + (it.dry ? ' <span class="badge warn">生重</span>' : '') + (it.swappedFrom ? ' <span class="badge info">已替换</span>' : '') + '</td>' +
+          '<td>' + esc(catLabel(it.cat)) + '</td>' +
+          '<td class="num">' + n(it.exch, 2) + '</td>' +
+          '<td class="num">' + n(it.grams) + '</td>' +
+          '<td class="hint">' + esc(portionText(it)) + '</td>' +
+          '<td class="num">' + n(f.kcal * it.grams / 100) + '</td>' +
+          '<td class="num">' + n(f.pro * it.grams / 100, 1) + '</td>' +
+          '<td class="num">' + n(f.fat * it.grams / 100, 1) + '</td>' +
+          '<td class="num">' + n(f.cho * it.grams / 100, 1) + '</td>' +
+          '<td class="num">' + (f.fibEst ? '≈' : '') + n(f.fib * it.grams / 100, 1) + '</td>' +
+          '<td class="num">' + giText(f) + '</td>' +
+          '<td class="num">' + glText(f, it.grams) + '</td>' +
+          '<td class="no-print"><button class="btn ghost mini" data-swap-meal="' + mi + '" data-swap-item="' + ii + '">替换</button></td>' +
+          '</tr>';
+      }).join('');
+      var nut = m.nutri;
+      html += '<div class="card" style="box-shadow:none">' +
+        '<h3>' + esc(m.label) + ' <span class="badge">' + esc(m.time || '') + '</span> ' +
+        badge(n(m.pctActual, 0) + '% 能量', 'info') + ' ' + badge(n(nut.kcal) + ' kcal', 'ok') +
+        ' ' + badge('GL ' + n(nut.gl, 1), nut.gl > 25 ? 'warn' : 'ok') +
+        ' ' + badge('蛋白 ' + n(nut.pro, 1) + ' g', '') + '</h3>' +
+        '<div class="scroll-x"><table class="tbl compact"><thead><tr>' +
+        '<th>食物（可食部）</th><th>分类</th><th class="num">交换份</th><th class="num">克数</th><th>家常计量</th>' +
+        '<th class="num">能量</th><th class="num">蛋白</th><th class="num">脂肪</th><th class="num">碳水</th><th class="num">纤维</th><th class="num">GI</th><th class="num">GL</th><th class="no-print"></th>' +
+        '</tr></thead><tbody>' + rows +
+        '<tr class="total"><td colspan="5">本餐合计</td><td class="num">' + n(nut.kcal) + '</td><td class="num">' + n(nut.pro, 1) +
+        '</td><td class="num">' + n(nut.fat, 1) + '</td><td class="num">' + n(nut.cho, 1) + '</td><td class="num">' + n(nut.fib, 1) +
+        '</td><td class="num">' + (nut.giAvg == null ? '—' : n(nut.giAvg, 1)) + '</td><td class="num">' + n(nut.gl, 1) + '</td><td class="no-print"></td></tr>' +
+        '</tbody></table></div></div>';
+    });
+
+    // 全天汇总行
+    html += '<div class="card" style="box-shadow:none"><h3>全天合计</h3>' +
+      '<table class="tbl compact"><thead><tr><th>项目</th><th class="num">食谱合计</th><th class="num">目标</th><th>评价</th></tr></thead><tbody>' +
+      dayRow('能量（成分表）', n(day.kcal) + ' kcal', n(rx.energy) + ' kcal', Math.abs(day.kcal - rx.energy) / rx.energy <= 0.07) +
+      dayRow('能量（按 4/4/9 折算）', n(day.macroKcal) + ' kcal', n(rx.energy) + ' kcal', Math.abs(day.macroKcal - rx.energy) / rx.energy <= 0.03) +
+      dayRow('碳水化合物', n(day.cho) + ' g', n(rx.choG) + ' g', Math.abs(day.cho - rx.choG) / rx.choG <= 0.08) +
+      dayRow('蛋白质', n(day.pro) + ' g', rx.proRangeG[0] + '～' + rx.proRangeG[1] + ' g', day.pro >= rx.proRangeG[0] * 0.95 && day.pro <= rx.proRangeG[1] * 1.05) +
+      dayRow('脂肪', n(day.fat) + ' g', n(rx.fatG) + ' g', Math.abs(day.fat - rx.fatG) / rx.fatG <= 0.12) +
+      dayRow('膳食纤维', n(day.fib, 1) + ' g', '≥ ' + n(rx.fiberG) + ' g', day.fib >= rx.fiberG * 0.9) +
+      dayRow('钠（食物本身）', n(day.na) + ' mg', '< 2000 mg', day.na < 2000) +
+      dayRow('胆固醇', n(day.chol) + ' mg', '参考 < 300 mg', day.chol < 450) +
+      dayRow('血糖负荷 GL', n(day.gl, 1), '理想 ≤ 80', day.gl <= 110) +
+      dayRow('平均 GI（按碳水）', day.giAvg == null ? '—' : n(day.giAvg, 1), '≤ 55 低 GI', day.giAvg != null && day.giAvg <= 60) +
+      '</tbody></table>' +
+      '<p class="hint">校准轮次 ' + (state.iterations || 1) + '；食物克数均为可食部重量，标「生重」者按干重（未蒸煮）计。' +
+      '成分表「能量」与 4/4/9 折算值通常相差 3%～5%，属数据口径差异。</p></div>';
+
+    $('planWrap').innerHTML = html;
+    renderDayNutri();
+    renderGlycemic();
+    renderChecks();
+    bindPlanSwapButtons();
+  }
+
+  function dayRow(name, actual, target, pass) {
+    return '<tr><td>' + esc(name) + '</td><td class="num">' + esc(actual) + '</td><td class="num">' + esc(target) +
+      '</td><td>' + (pass ? badge('达标', 'ok') : badge('需关注', 'warn')) + '</td></tr>';
+  }
+
+  function barLine(label, actual, target, unit, fmt) {
+    var pct = target > 0 ? actual / target * 100 : 0;
+    var cls = pct > 115 ? 'over' : (pct < 85 ? 'low' : '');
+    return '<div class="nutri-line"><div class="lab"><span>' + esc(label) + '</span><span>' +
+      n(actual, fmt == null ? 0 : fmt) + ' / ' + n(target, fmt == null ? 0 : fmt) + ' ' + esc(unit || '') +
+      '（' + n(pct, 0) + '%）</span></div><div class="bar"><i class="' + cls + '" style="width:' + Math.min(100, pct) + '%"></i></div></div>';
+  }
+
+  function renderDayNutri() {
+    var d = state.day, rx = state.rx;
+    if (!d) return;
+    var ratio = d.kcal > 0 ? d.macroKcal / d.kcal : 1;
+    $('dayNutri').innerHTML =
+      barLine('能量', d.kcal, rx.energy, 'kcal') +
+      barLine('碳水化合物', d.cho, rx.choG, 'g', 0) +
+      barLine('蛋白质', d.pro, rx.proG, 'g', 0) +
+      barLine('脂肪', d.fat, rx.fatG, 'g', 0) +
+      barLine('膳食纤维', d.fib, rx.fiberG, 'g', 1) +
+      barLine('钠（食物本身）', d.na, 2000, 'mg', 0) +
+      '<table class="tbl compact" style="margin-top:10px"><tbody>' +
+      '<tr><td>供能比（碳水 / 蛋白 / 脂肪）</td><td class="num">' +
+      n(d.cho * 4 / d.macroKcal * 100, 0) + '% / ' + n(d.pro * 4 / d.macroKcal * 100, 0) + '% / ' + n(d.fat * 9 / d.macroKcal * 100, 0) + '%</td></tr>' +
+      '<tr><td>胆固醇 / 钾</td><td class="num">' + n(d.chol) + ' mg / ' + n(d.k) + ' mg</td></tr>' +
+      '<tr><td>食物总重量（可食部）</td><td class="num">' + n(d.mass) + ' g</td></tr>' +
+      '</tbody></table>';
+  }
+
+  function renderGlycemic() {
+    var plan = state.plan, day = state.day;
+    if (!plan) return;
+    var high = [];
+    plan.meals.forEach(function (m) {
+      m.items.forEach(function (it) {
+        if (it.food.gi != null && it.food.gi >= 70) high.push({ m: m.label, f: it.food, g: it.grams, it: it });
+      });
+    });
+    $('glycemicBox').innerHTML =
+      plan.meals.map(function (m) {
+        var pct = Math.min(100, m.nutri.gl / 40 * 100);
+        return '<div class="nutri-line"><div class="lab"><span>' + esc(m.label) + '（碳水 ' + n(m.nutri.cho, 0) + ' g，平均 GI ' +
+          (m.nutri.giAvg == null ? '—' : n(m.nutri.giAvg, 0)) + '）</span><span>GL ' + n(m.nutri.gl, 1) + '</span></div>' +
+          '<div class="bar"><i class="' + (m.nutri.gl > 25 ? 'over' : '') + '" style="width:' + pct + '%"></i></div></div>';
+      }).join('') +
+      '<p class="hint">单餐 GL ≤25 更有利于餐后血糖平稳；本方案全天 GL <b>' + n(day.gl, 1) + '</b>，平均 GI <b>' +
+      (day.giAvg == null ? '—' : n(day.giAvg, 1)) + '</b>。</p>' +
+      (high.length ? '<div class="note warn"><b>高 GI（≥70）食物提示：</b><ul>' + high.map(function (h) {
+        return '<li>' + esc(h.m) + '：' + esc(h.f.name) + ' ' + n(h.g) + ' g（GI ' + n(h.f.gi) + '）→ 可在第③步按碳水等价替换为低 GI 品种</li>';
+      }).join('') + '</ul></div>' : '<div class="note ok">本方案未使用 GI ≥70 的主食类食物。</div>');
+  }
+
+  function renderChecks() {
+    var checks = state.checks || [];
+    var key = checks.filter(function (c) { return c.level === 'key'; });
+    var watch = checks.filter(function (c) { return c.level !== 'key'; });
+    var passed = key.filter(function (c) { return c.pass; }).length;
+    $('checkTbl').innerHTML =
+      '<thead><tr><th>项目</th><th>目标</th><th>本次食谱</th><th>结果</th></tr></thead><tbody>' +
+      '<tr class="sub"><td colspan="4">关键项目 ' + passed + ' / ' + key.length + ' 达标</td></tr>' +
+      key.map(checkRow).join('') +
+      '<tr class="sub"><td colspan="4">关注项目（参考值，需结合个体情况判断）</td></tr>' +
+      watch.map(checkRow).join('') +
+      '</tbody>';
+  }
+  function checkRow(c) {
+    return '<tr><td>' + esc(c.name) + '</td><td class="hint">' + esc(c.target) + '</td><td>' + esc(c.actual) +
+      '<div class="hint">' + esc(c.note) + '</div></td><td>' + (c.pass ? badge('达标', 'ok') : badge('需关注', 'warn')) + '</td></tr>';
+  }
+
+  /* ------------------------------------------- 食谱内逐项替换（平替） */
+  function bindPlanSwapButtons() {
+    document.querySelectorAll('#planWrap button[data-swap-meal]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var mi = +btn.getAttribute('data-swap-meal'), ii = +btn.getAttribute('data-swap-item');
+        openInlineSwap(mi, ii, btn);
+      });
+    });
+  }
+
+  function openInlineSwap(mi, ii, btn) {
+    var m = state.plan.meals[mi], it = m.items[ii];
+    var cands = P.swapCandidates(it.food, 'carb', { sameCat: true, lowGI: false })
+      .filter(function (c) { return c.food.cat === it.food.cat; });
+    var box = document.createElement('div');
+    box.className = 'note';
+    box.innerHTML = '<b>把「' + esc(it.food.name) + '（' + n(it.exch, 2) + ' 交换份）替换为：</b>' +
+      '<div class="cand-list">' + cands.slice(0, 40).map(function (c, k) {
+        var g = Math.round(it.exch / c.food.exch100 * 100 / 5) * 5;
+        return '<div class="cand" data-k="' + k + '"><div><b>' + esc(c.food.name) + '</b> <span class="g">' +
+          n(g) + ' g（' + esc(portionText({ food: c.food, grams: g, dry: P.isDry(c.food) })) + '）</span>' +
+          '<div class="d">能量 ' + n(c.food.kcal * g / 100) + ' kcal · 碳水 ' + n(c.food.cho * g / 100, 1) +
+          ' g · 纤维 ' + n(c.food.fib * g / 100, 1) + ' g · GI ' + giText(c.food) + '</div></div>' +
+          '<button class="btn mini">替换</button></div>';
+      }).join('') + '</div>';
+    btn.parentNode.appendChild(box);
+    box.querySelectorAll('.cand').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var c = cands[+el.getAttribute('data-k')];
+        var grams = Math.round(it.exch / c.food.exch100 * 100 / 5) * 5;
+        m.items[ii] = {
+          food: c.food, exch: it.exch, grams: grams, rawGrams: grams,
+          dry: P.isDry(c.food), cat: c.food.cat, swappedFrom: it.food.name
+        };
+        m.nutri = P.sumItems(m.items);
+        state.day = P.sumMeals(state.plan.meals);
+        state.checks = P.runChecks(state.day, state.rx, state.profile, { meals: state.plan.meals, preset: state.plan.preset });
+        renderPlan();
+        renderAdjustedPlan();
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------- ③ 平替 */
+  function renderSwapFromOptions() {
+    var groups = {};
+    P.DB.forEach(function (f) { (groups[f.cat] = groups[f.cat] || []).push(f); });
+    var html = Object.keys(groups).map(function (c) {
+      return '<optgroup label="' + esc(catLabel(c)) + '">' + groups[c].map(function (f) {
+        return '<option value="' + esc(f.name) + '">' + esc(f.name) + '（GI ' + giText(f) + '，' + n(f.kcal) + ' kcal/100g）</option>';
+      }).join('') + '</optgroup>';
+    }).join('');
+    $('swapFrom').innerHTML = html;
+    if (state.swapFrom) $('swapFrom').value = state.swapFrom;
+  }
+
+  function renderSwapCandidates() {
+    var name = $('swapFrom').value;
+    var src = P.F(name);
+    if (!src) return;
+    state.swapFrom = name;
+    var mode = $('swapMode').value;
+    var cands = P.swapCandidates(src, mode, {
+      sameCat: $('swapSameCat').checked,
+      lowGI: $('swapLowGI').checked
+    });
+    if (!cands.length) {
+      $('swapCandidates').innerHTML = '<p class="hint">没有找到合适的等价替换项，可放宽筛选条件（如取消「仅显示 GI 不高于原食材」）。</p>';
+      return;
+    }
+    $('swapCandidates').innerHTML = '<p class="hint">共 ' + cands.length + ' 个候选，按「GI → 全谷杂豆优先 → 膳食纤维」排序（已按' +
+      ({ carb: '碳水', energy: '能量', protein: '蛋白质' }[mode]) + '等价计算克数）：</p>' +
+      (cands.some(function (c) { return c.food.tags.indexOf('pureCarb') >= 0; }) ?
+        '<div class="note warn">列表中的粉丝、粉条、藕粉等纯淀粉制品 GI 虽低，但几乎只提供淀粉（蛋白质、维生素、矿物质与膳食纤维极少），不建议作为主食主力，仅作偶尔替换。</div>' : '') +
+      '<div class="cand-list">' + cands.slice(0, 80).map(function (c, k) {
+        var f = c.food;
+        return '<div class="cand" data-k="' + k + '"><div><b>' + esc(f.name) + '</b> <span class="g">' +
+          n(c.grams) + ' g · ' + n(f.exch100 * c.grams / 100, 2) + ' 交换份</span>' +
+          '<div class="d">能量 ' + n(f.kcal * c.grams / 100) + ' kcal（Δ ' + (c.delta.kcal > 0 ? '+' : '') + n(c.delta.kcal, 0) +
+          '）· 碳水 ' + n(f.cho * c.grams / 100, 1) + ' g（Δ ' + (c.delta.cho > 0 ? '+' : '') + n(c.delta.cho, 1) +
+          '）· 纤维 ' + n(f.fib * c.grams / 100, 1) + ' g · GI ' + giText(f) + '</div></div>' +
+          '<button class="btn ghost mini">对比</button></div>';
+      }).join('') + '</div>';
+    $('swapCandidates').querySelectorAll('.cand').forEach(function (el) {
+      el.addEventListener('click', function () { renderSwapCompare(src, cands[+el.getAttribute('data-k')], mode); });
+    });
+  }
+
+  function renderSwapCompare(src, cand, mode) {
+    var f = cand.food, g = cand.grams;
+    function line(label, a, b, unit, d) {
+      var delta = b - a;
+      return '<tr><td>' + label + '</td><td class="num">' + n(a, d) + '</td><td class="num">' + n(b, d) +
+        '</td><td class="num">' + (delta > 0 ? '+' : '') + n(delta, d) + ' ' + (unit || '') + '</td></tr>';
+    }
+    var aG = 100, bG = g;
+    $('swapCompare').innerHTML =
+      '<h3>等量替换（按' + ({ carb: '碳水', energy: '能量', protein: '蛋白质' }[mode]) + '等价）</h3>' +
+      '<p><b>' + esc(src.name) + ' 100 g</b> ⇄ <b>' + esc(f.name) + ' ' + n(g) + ' g</b>（' +
+      esc(portionText({ food: f, grams: g, dry: P.isDry(f) })) + '）</p>' +
+      '<table class="tbl compact"><thead><tr><th>项目</th><th class="num">' + esc(src.name) + '</th><th class="num">' +
+      esc(f.name) + '</th><th class="num">差值</th></tr></thead><tbody>' +
+      line('能量 kcal', src.kcal, f.kcal * bG / 100, '', 0) +
+      line('蛋白质 g', src.pro, f.pro * bG / 100, '', 1) +
+      line('脂肪 g', src.fat, f.fat * bG / 100, '', 1) +
+      line('碳水 g', src.cho, f.cho * bG / 100, '', 1) +
+      line('膳食纤维 g', src.fib, f.fib * bG / 100, '', 1) +
+      line('GI', src.gi == null ? 0 : src.gi, f.gi == null ? 0 : f.gi, '', 0) +
+      line('GL', src.gi == null ? 0 : src.gi * src.cho / 100, f.gi == null ? 0 : f.gi * f.cho * bG / 10000, '', 1) +
+      '</tbody></table>' +
+      '<p class="hint">数据来源：' + esc(src.giSrc || '') + '<br>' + esc(f.giSrc || '') + '</p>' +
+      '<div class="row"><button class="btn" id="btnApplySwap">应用到食谱中的同类食材</button></div>';
+    $('btnApplySwap').addEventListener('click', function () { applySwapToPlan(src, f); });
+  }
+
+  function applySwapToPlan(src, newFood) {
+    if (!state.plan) return alert('请先生成配餐模板。');
+    var count = 0;
+    state.plan.meals.forEach(function (m) {
+      m.items.forEach(function (it, k) {
+        if (it.food.name !== src.name) return;
+        var grams = Math.round(it.exch / newFood.exch100 * 100 / 5) * 5;
+        m.items[k] = { food: newFood, exch: it.exch, grams: grams, rawGrams: grams, dry: P.isDry(newFood), cat: newFood.cat, swappedFrom: src.name };
+        count++;
+      });
+      m.nutri = P.sumItems(m.items);
+    });
+    if (!count) return alert('当前食谱中没有「' + src.name + '」，可在第②步的食谱表格中逐项替换。');
+    state.day = P.sumMeals(state.plan.meals);
+    state.checks = P.runChecks(state.day, state.rx, state.profile, { meals: state.plan.meals, preset: state.plan.preset });
+    renderPlan();
+    renderAdjustedPlan();
+    alert('已替换 ' + count + ' 处。');
+  }
+
+  /* ---------------------------------------------------- 食物成分查询 */
+  function renderFoodTable() {
+    var kw = $('foodSearch').value.trim();
+    var cat = $('foodCatFilter').value;
+    var sort = $('foodSort').value;
+    var list = P.DB.filter(function (f) {
+      if (cat && f.cat !== cat) return false;
+      if (kw && f.name.indexOf(kw) < 0 && (f.srcCat || '').indexOf(kw) < 0) return false;
+      return true;
+    });
+    list.sort(function (a, b) {
+      if (sort === 'gi') return (a.gi == null ? 999 : a.gi) - (b.gi == null ? 999 : b.gi);
+      if (sort === 'gl') return (a.gi == null ? 999 : a.gi * a.cho) - (b.gi == null ? 999 : b.gi * b.cho);
+      if (sort === 'kcal') return a.kcal - b.kcal;
+      return a.name.localeCompare(b.name, 'zh');
+    });
+    $('foodTbl').innerHTML = '<thead><tr><th>食物（每 100 g 可食部）</th><th>分类</th><th class="num">能量</th>' +
+      '<th class="num">蛋白</th><th class="num">脂肪</th><th class="num">碳水</th><th class="num">纤维</th>' +
+      '<th class="num">GI</th><th class="num">GL</th><th class="num">交换份</th><th>家常计量 / 数据来源</th></tr></thead><tbody>' +
+      list.map(function (f) {
+        return '<tr><td>' + esc(f.name) + '</td><td>' + esc(catLabel(f.cat)) + '</td>' +
+          '<td class="num">' + n(f.kcal) + '</td><td class="num">' + n(f.pro, 1) + '</td><td class="num">' + n(f.fat, 1) +
+          '</td><td class="num">' + n(f.cho, 1) + '</td><td class="num">' + (f.fibEst ? '≈' : '') + n(f.fib, 1) +
+          '</td><td class="num">' + giText(f) + '</td><td class="num">' + (f.gi == null ? '—' : n(f.gi * f.cho / 100, 1)) +
+          '</td><td class="num">' + n(f.exch100, 2) + '</td><td class="hint">' + esc(f.unitName || '—') +
+          '<br>' + esc((f.srcCat || '') + '　' + (f.giSrc || '')) + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  function renderFoodStat() {
+    var stat = {};
+    P.DB.forEach(function (f) { stat[f.cat] = (stat[f.cat] || 0) + 1; });
+    var withGI = P.DB.filter(function (f) { return f.gi != null; }).length;
+    $('foodStatTbl').innerHTML = '<thead><tr><th>分类</th><th class="num">条目数</th><th>说明</th></tr></thead><tbody>' +
+      Object.keys(stat).map(function (c) {
+        return '<tr><td>' + esc(catLabel(c)) + '</td><td class="num">' + stat[c] + '</td><td class="hint">' +
+          esc((P.CAT_META[c] || {}).role || '') + '</td></tr>';
+      }).join('') +
+      '<tr class="total"><td>合计</td><td class="num">' + P.DB.length + '</td><td class="hint">其中含 GI 值 ' + withGI +
+      ' 条；' + esc(window.DATA_VERSION || '') + '</td></tr></tbody>';
+  }
+
+  /* -------------------------------------------------- ④ 血糖 · 运动 */
+  function readGlucoseInput() {
+    var now = $('gTime').value ? new Date($('gTime').value) : new Date();
+    return {
+      now: now,
+      bg: +$('gValue').value,
+      trend: $('gTrend').value,
+      phase: $('gPhase').value,
+      sinceMeal: +$('gSinceMeal').value || null,
+      symptoms: $('gSymptoms').value,
+      next: $('gNext').value,
+      exIntensity: $('gExIntensity').value,
+      exMin: +$('gExMin').value || 30,
+      ketone: $('gKetone').value,
+      profile: state.profile
+    };
+  }
+
+  function runGlucose() {
+    var inp = readGlucoseInput();
+    if (!inp.bg || inp.bg <= 0) { alert('请输入当前血糖值（mmol/L）。'); return; }
+    var res = G.assess(inp, state.rules);
+    state.glucose = { input: inp, result: res };
+    renderGlucose();
+    renderTimeline();
+    renderAdjustedPlan();
+  }
+
+  function renderGlucose() {
+    if (!state.glucose) return;
+    var res = state.glucose.result;
+    var lv = res.level;
+    var badgeEl = $('gLevelBadge');
+    badgeEl.textContent = lv.label + ' · ' + res.bg + ' mmol/L';
+    badgeEl.className = 'badge ' + lv.color;
+    var ex = res.exercise;
+
+    function list(arr) { return arr && arr.length ? '<ul>' + arr.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; }
+
+    $('gOut').innerHTML =
+      '<div class="note ' + (lv.color === 'danger' ? 'danger' : (lv.color === 'warn' ? 'warn' : 'ok')) + '">' +
+      '<b>' + esc(lv.label) + '</b>：' + esc(res.summary) + '<br><span class="hint">本时段参考目标：' + esc(lv.target) + '</span></div>' +
+      (res.actions.length ? '<h3>① 立即处理</h3>' + res.actions.map(function (a) {
+        return '<div class="note danger"><b>' + esc(a.title) + '</b><br>' + esc(a.detail) + '</div>';
+      }).join('') : '') +
+      '<h3>② 进餐时间与顺序</h3>' +
+      '<div class="note"><b>' + (res.meal.delayMin > 0 ? '建议推迟约 ' + res.meal.delayMin + ' 分钟进餐' : '按计划时间进餐') + '</b><br>' +
+      esc(res.meal.reason) + '<br>' + esc(res.meal.order) + '</div>' +
+      '<h3>③ 量与种类调整（下一餐）</h3>' +
+      '<div class="note ' + (res.meal.carbFactor < 0.95 ? 'warn' : 'ok') + '"><b>主食系数 ×' + n(res.meal.carbFactor, 2) + '</b>（1.00 = 按原食谱）' +
+      list(res.meal.notes) + '</div>' +
+      '<div class="note"><b>加餐建议：</b>' + esc(res.meal.snackTip) + '</div>' +
+      '<h3>④ 运动处方</h3>' +
+      '<div class="note ' + (ex.allowed ? '' : 'danger') + '">' +
+      '<b>' + (ex.allowed ? '可以运动' : '暂缓运动') + '</b>' +
+      (ex.blockReasons.length ? list(ex.blockReasons) : '') +
+      (ex.allowed ? '<ul>' +
+        '<li>开始时间：<b>' + (ex.startAfterMealMin > 0 ? '餐后约 ' + ex.startAfterMealMin + ' 分钟' : '现在即可') + '</b>（自第一口饭算起，45～90 分钟为宜）</li>' +
+        '<li>强度与形式：<b>' + esc(ex.intensityLabel) + '</b></li>' +
+        '<li>时长：<b>' + ex.minutes + ' 分钟</b>' + (ex.preCarbG ? '；运动前先补充约 ' + ex.preCarbG + ' g 碳水' : '') + '</li>' +
+        '<li>监测：' + ex.monitor.map(function (m) { return esc(m.label); }).join('；') + '</li>' +
+        '<li>' + esc(ex.weekly) + '</li>' +
+        (ex.reason ? '<li>调整说明：' + esc(ex.reason) + '</li>' : '') +
+        '</ul>' : '') +
+      (ex.cautions.length ? '<div class="hint" style="margin-top:6px">注意事项：' + ex.cautions.map(esc).join('；') + '</div>' : '') +
+      '</div>' +
+      '<h3>⑤ 复测计划</h3>' + (res.rechecks.length ?
+        '<div class="note"><ul>' + res.rechecks.map(function (r) {
+          return '<li>' + esc(r.label) + (r.afterMin > 0 ? '（约 ' + G.hhmm(G.addMin(new Date(), r.afterMin)) + '）' : '') + '</li>';
+        }).join('') + '</ul></div>' : '<div class="hint">按常规监测频次执行（如每周 2～4 次配对血糖）。</div>') +
+      (res.warnings.length ? '<h3>⑥ 就医预警</h3><div class="note danger">' + list(res.warnings) + '</div>' : '') +
+      (state.rules ? '<p class="hint">判定阈值：低血糖 <' + state.rules.hypoLow + '，严重低血糖 <' + state.rules.hypoSerious +
+        '，运动前上限 ' + state.rules.exerciseMaxBG + '，运动前下限 ' + state.rules.exerciseMinBG + ' mmol/L（可在第⑤步修改）。</p>' : '');
+  }
+
+  function renderTimeline() {
+    if (!state.glucose || !state.plan) { $('timeline').innerHTML = '<p class="hint">生成配餐模板并录入血糖后，会显示当日的进餐、加餐、运动与监测时间轴。</p>'; return; }
+    var ev = G.buildTimeline(state.glucose.input.now, state.plan.meals, state.glucose.result.exercise, state.glucose.result);
+    var kindLabel = { meal: '正餐', snack: '加餐', exercise: '运动', monitor: '监测', carb: '处理' };
+    $('timeline').innerHTML = '<div class="timeline">' + ev.map(function (e) {
+      return '<div class="tl-row"><div class="tl-time">' + esc(G.hhmm(e.at)) + '</div>' +
+        '<div class="tl-kind ' + e.kind + '">' + esc(kindLabel[e.kind] || e.kind) + '</div>' +
+        '<div><b>' + esc(e.label) + '</b>' + (e.detail ? '<div class="tl-detail">' + esc(e.detail) + '</div>' : '') + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  /** 按血糖建议调整当日配餐（改量 + 改种类） */
+  function renderAdjustedPlan() {
+    var plan = state.plan, res = state.glucose && state.glucose.result;
+    if (!plan) { $('adjustedPlan').innerHTML = '<p class="hint">请先在①生成配餐模板。</p>'; return; }
+    if (!res) { $('adjustedPlan').innerHTML = '<p class="hint">录入血糖并计算后，这里会显示按血糖调整过的量与种类。</p>'; return; }
+
+    var factor = res.meal.carbFactor, needLow = res.meal.needLowGI;
+    // 找出「下一餐」：当前时间之后最近的正餐；若已过晚餐时间，则按次日早餐计算
+    var now = state.glucose.input.now;
+    var target = null, nextDay = false, firstMain = null;
+    state.plan.meals.forEach(function (m) {
+      if (/加餐/.test(m.label)) return;
+      var hm = /^(\d{1,2}):(\d{2})/.exec(m.time || '');
+      if (!hm) return;
+      var d = new Date(now); d.setHours(+hm[1], +hm[2], 0, 0);
+      if (!firstMain) firstMain = { m: m, at: d };
+      if (d >= now && (!target || d < target.at)) target = { m: m, at: d };
+    });
+    if (!target) { target = firstMain; nextDay = true; }
+    target = target ? target.m : state.plan.meals[0];
+
+    var adj = JSON.parse(JSON.stringify({ label: target.label, items: target.items.map(function (it) {
+      return { cat: it.cat, exch: it.exch, grams: it.grams, dry: it.dry, food: it.food.name };
+    }) }));
+
+    var lowGIGrain = P.DB.filter(function (f) { return f.cat === 'grain' && f.gi != null && f.gi <= 55; })
+      .sort(function (a, b) { return a.gi - b.gi; });
+    var rows = adj.items.map(function (it) {
+      var f = P.F(it.food);
+      var grams = it.grams, note = [];
+      if (it.cat === 'grain') {
+        grams = Math.max(10, Math.round(it.grams * factor / 5) * 5);
+        if (factor !== 1) note.push('量 ×' + n(factor, 2));
+        if (needLow && f.gi != null && f.gi > 55 && lowGIGrain.length) {
+          var rep = lowGIGrain[0];
+          var g2 = Math.round(it.exch / rep.exch100 * 100 / 5) * 5;
+          note.push('换成低 GI：' + rep.name);
+          return { name: rep.name, grams: g2, note: note.join('，'), kcal: rep.kcal * g2 / 100, cho: rep.cho * g2 / 100 };
+        }
+      }
+      return { name: f.name, grams: grams, note: note.join('，'), kcal: f.kcal * grams / 100, cho: f.cho * grams / 100 };
+    });
+
+    var carbAdj = rows.filter(function (r) { return true; }).reduce(function (a, r) { return a + r.cho; }, 0);
+    var carbOri = adj.items.reduce(function (a, it) { return a + P.F(it.food).cho * it.grams / 100; }, 0);
+
+    $('adjustedPlan').innerHTML =
+      '<div class="note ' + (factor < 0.95 ? 'warn' : 'ok') + '"><b>' + esc(target.label) + '（' + esc(target.time) + '）调整：</b>' +
+      '主食 ×' + n(factor, 2) + (needLow ? '，并把高 GI 主食替换为低 GI 品种' : '') +
+      '；本餐可利用碳水由 <b>' + n(carbOri, 0) + ' g</b> 调整为 <b>' + n(carbAdj, 0) + ' g</b>。' +
+      (res.meal.delayMin > 0 ? '　进餐时间推迟约 ' + res.meal.delayMin + ' 分钟。' : '') +
+      (nextDay ? '　（当前已过晚餐时间，以下按次日' + esc(target.label) + '计算）' : '') + '</div>' +
+      '<table class="tbl compact"><thead><tr><th>食物</th><th class="num">原克数</th><th class="num">调整后克数</th>' +
+      '<th class="num">能量</th><th class="num">碳水</th><th>说明</th></tr></thead><tbody>' +
+      rows.map(function (r, k) {
+        return '<tr><td>' + esc(r.name) + '</td><td class="num">' + n(adj.items[k].grams) + '</td><td class="num">' + n(r.grams) +
+          '</td><td class="num">' + n(r.kcal) + '</td><td class="num">' + n(r.cho, 1) + '</td><td class="hint">' + esc(r.note || '不变') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="hint">说明：调整仅针对下一餐的主食（碳水是餐后血糖的主要决定因素）；蔬菜与蛋白质按原量执行，必要时可增加非淀粉类蔬菜 100～200 g 增加饱腹感。' +
+      '使用胰岛素或促泌剂者，主食量变化应在医生/营养师指导下与药量匹配，切勿自行增减药量。</p>' +
+      '<div class="row no-print"><button class="btn ghost" id="btnApplyAdjust">把调整写入配餐模板</button></div>';
+
+    $('btnApplyAdjust').addEventListener('click', function () {
+      var byCat = {};
+      rows.forEach(function (r, k) {
+        var of = P.F(adj.items[k].food);
+        if (of.cat !== 'grain') return;
+        var nf = P.F(r.name);
+        byCat[adj.items[k].exch] = { from: of.name, to: nf.name, grams: r.grams, exch: adj.items[k].exch };
+      });
+      target.items.forEach(function (it, k) {
+        if (it.cat !== 'grain') return;
+        var nf = P.F(rows[k] ? rows[k].name : it.food.name);
+        if (!nf) return;
+        var grams = rows[k] ? rows[k].grams : it.grams;
+        target.items[k] = { food: nf, exch: it.exch, grams: grams, rawGrams: grams, dry: P.isDry(nf), cat: 'grain', swappedFrom: it.food.name };
+      });
+      target.nutri = P.sumItems(target.items);
+      state.day = P.sumMeals(state.plan.meals);
+      state.checks = P.runChecks(state.day, state.rx, state.profile, { meals: state.plan.meals, preset: state.plan.preset });
+      renderPlan();
+      renderAdjustedPlan();
+    });
+  }
+
+  /* ------------------------------------------------------------ CGM */
+  function runCGM(readings) {
+    if (!readings || !readings.length) { alert('未解析到有效读数，请检查数据格式（时间,血糖）。'); return; }
+    var res = G.analyzeCGM(readings, state.rules);
+    state.cgm = { res: res, readings: readings };
+    renderCGM();
+  }
+
+  function renderCGM() {
+    if (!state.cgm) return;
+    var r = state.cgm.res;
+    $('cgmOut').innerHTML =
+      '<table class="tbl compact" style="margin-top:10px"><tbody>' +
+      '<tr><td>读数条数 / 时间范围</td><td class="num">' + r.n + ' 条，' + r.from.toLocaleString() + ' → ' + r.to.toLocaleString() + '</td></tr>' +
+      '<tr><td>平均血糖</td><td class="num">' + n(r.mean, 1) + ' mmol/L（SD ' + n(r.sd, 1) + '，CV ' + n(r.cv, 0) + '%）</td></tr>' +
+      '<tr><td>目标范围内时间 TIR（3.9～10.0）</td><td class="num">' + n(r.tir, 0) + '%（严格 3.9～7.8：' + n(r.tirTight, 0) + '%）</td></tr>' +
+      '<tr><td>低于目标范围 TBR（<3.9 / <3.0）</td><td class="num">' + n(r.tbr, 0) + '% / ' + n(r.tbr2, 0) + '%</td></tr>' +
+      '<tr><td>高于目标范围 TAR（>10.0 / >13.9）</td><td class="num">' + n(r.tar, 0) + '% / ' + n(r.tar2, 0) + '%</td></tr>' +
+      '<tr><td>最高 / 最低</td><td class="num">' + n(r.max, 1) + ' / ' + n(r.min, 1) + ' mmol/L</td></tr>' +
+      '<tr><td>估算 HbA1c（GMI）</td><td class="num">' + n(r.gmi, 1) + '%</td></tr>' +
+      '<tr><td>低血糖事件（连续 ≥15 分钟 <3.9）</td><td class="num">' + r.hypoEvents.length + ' 次</td></tr>' +
+      '</tbody></table>' +
+      (r.flags.length ? r.flags.map(function (f) {
+        return '<div class="note ' + (f.level === 'danger' ? 'danger' : 'warn') + '">' + esc(f.text) + '</div>';
+      }).join('') : '<div class="note ok">各项指标均在常用目标范围，继续保持。</div>');
+    drawCGMChart(r);
+  }
+
+  function drawCGMChart(r) {
+    var cv = $('cgmChart');
+    var ctx = cv.getContext('2d');
+    var W = cv.width, H = cv.height, padL = 42, padR = 10, padT = 12, padB = 22;
+    var vals = r.readings.map(function (x) { return x.v; });
+    var maxV = Math.max(15, Math.ceil(Math.max.apply(null, vals) + 1));
+    var minV = Math.max(0, Math.floor(Math.min.apply(null, vals) - 1));
+    function x(i) { return padL + (W - padL - padR) * (i / Math.max(1, r.readings.length - 1)); }
+    function y(v) { return padT + (H - padT - padB) * (1 - (v - minV) / (maxV - minV)); }
+    ctx.clearRect(0, 0, W, H);
+    // TIR 区间
+    ctx.fillStyle = 'rgba(34,197,94,.10)';
+    ctx.fillRect(padL, y(10), W - padL - padR, y(3.9) - y(10));
+    // 网格与刻度
+    ctx.strokeStyle = '#e5e7eb'; ctx.fillStyle = '#6b7280'; ctx.font = '10px sans-serif';
+    for (var v = Math.ceil(minV / 5) * 5; v <= maxV; v += 5) {
+      ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(W - padR, y(v)); ctx.stroke();
+      ctx.fillText(v + '', 8, y(v) + 3);
+    }
+    // 阈值线
+    [[3.9, '#dc2626'], [10, '#f59e0b'], [13.9, '#b91c1c']].forEach(function (t) {
+      if (t[0] < minV || t[0] > maxV) return;
+      ctx.strokeStyle = t[1]; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(padL, y(t[0])); ctx.lineTo(W - padR, y(t[0])); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+    // 曲线
+    ctx.strokeStyle = '#0f766e'; ctx.lineWidth = 1.6; ctx.beginPath();
+    r.readings.forEach(function (p, i) { i ? ctx.lineTo(x(i), y(p.v)) : ctx.moveTo(x(i), y(p.v)); });
+    ctx.stroke();
+    // 低血糖点
+    ctx.fillStyle = '#dc2626';
+    r.readings.forEach(function (p, i) { if (p.v < 3.9) { ctx.beginPath(); ctx.arc(x(i), y(p.v), 2.2, 0, 6.29); ctx.fill(); } });
+    // 时间轴标签
+    ctx.fillStyle = '#6b7280';
+    [0, Math.floor(r.readings.length / 2), r.readings.length - 1].forEach(function (i) {
+      var d = r.readings[i].t, lab = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+      ctx.fillText(lab, Math.min(W - 34, x(i) - 12), H - 6);
+    });
+  }
+
+  /* ------------------------------------------------------- 存档 / 导入 */
+  function exportData() {
+    return {
+      patientId: state.patientId, profile: state.profile, opts: state.opts,
+      rx: state.rx, rules: state.rules,
+      meals: state.plan ? state.plan.meals.map(function (m) {
+        return {
+          label: m.label, time: m.time, byCat: m.byCat,
+          items: m.items.map(function (it) { return { name: it.food.name, exch: it.exch, grams: it.grams, cat: it.cat }; }),
+          nutri: m.nutri
+        };
+      }) : null,
+      day: state.day, glucose: state.glucose ? { input: { bg: state.glucose.input.bg, phase: state.glucose.input.phase, trend: state.glucose.input.trend }, level: state.glucose.result.level.label } : null,
+      exportedAt: new Date().toISOString()
+    };
+  }
+
+  function saveToLocal() {
+    var all = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    var id = state.patientId || ('未命名-' + new Date().toLocaleString());
+    all[id] = exportData();
+    localStorage.setItem(LS_KEY, JSON.stringify(all));
+    renderStoreList();
+    alert('已保存到本机浏览器：' + id);
+  }
+
+  function renderStoreList() {
+    var all = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    var keys = Object.keys(all);
+    $('storeList').innerHTML = keys.length ? '<table class="tbl compact"><thead><tr><th>编号 / 名称</th><th>能量</th><th>保存时间</th><th></th></tr></thead><tbody>' +
+      keys.map(function (k) {
+        var d = all[k];
+        return '<tr><td>' + esc(k) + '</td><td class="num">' + n(d.rx && d.rx.energy) + ' kcal</td><td class="hint">' +
+          esc((d.exportedAt || '').replace('T', ' ').slice(0, 16)) + '</td>' +
+          '<td><button class="btn ghost mini" data-load="' + esc(k) + '">读取</button> ' +
+          '<button class="btn ghost mini" data-del="' + esc(k) + '">删除</button></td></tr>';
+      }).join('') + '</tbody></table>' : '<p class="hint">本机暂无存档。</p>';
+    $('storeList').querySelectorAll('button[data-load]').forEach(function (b) {
+      b.addEventListener('click', function () { loadFrom(all[b.getAttribute('data-load')]); });
+    });
+    $('storeList').querySelectorAll('button[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        delete all[b.getAttribute('data-del')];
+        localStorage.setItem(LS_KEY, JSON.stringify(all));
+        renderStoreList();
+      });
+    });
+  }
+
+  function loadFrom(data, silent) {
+    if (!data) return;
+    state.patientId = data.patientId || '';
+    state.profile = Object.assign(state.profile, data.profile || {});
+    state.manual = {};
+    fillProfileForm();
+    renderProfile();
+    if (data.opts) {
+      $('mealPreset').value = data.opts.preset || 'three_snack';
+      $('flavorPref').value = data.opts.flavor || 'cn';
+      if (data.opts.mealPct) { state.opts.mealPct = data.opts.mealPct; $('mealPreset').value = 'custom'; }
+      renderMealPctBox();
+    }
+    state.rules = Object.assign({}, G.DEFAULT_RULES, data.rules || {});
+    renderRuleTable();
+    generatePlan(true);
+    if (data.meals) {
+      // 恢复精确食谱
+      state.plan.meals.forEach(function (m, i) {
+        var sm = data.meals[i]; if (!sm) return;
+        m.items = sm.items.map(function (it) {
+          var f = P.F(it.name);
+          return f ? { food: f, exch: it.exch, grams: it.grams, rawGrams: it.grams, dry: P.isDry(f), cat: f.cat } : null;
+        }).filter(Boolean);
+        m.nutri = P.sumItems(m.items);
+      });
+      state.day = P.sumMeals(state.plan.meals);
+      state.checks = P.runChecks(state.day, state.rx, state.profile, { meals: state.plan.meals, preset: state.plan.preset });
+      renderPlan();
+    }
+    renderFoodStat();
+    if (!silent) alert('已读取存档。');
+  }
+
+  /* ------------------------------------------------ 自检（#selftest） */
+  function saveToLocalSilent() {
+    var all = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    all[state.patientId || 'x'] = exportData();
+    localStorage.setItem(LS_KEY, JSON.stringify(all));
+  }
+  function applySwapToPlanSilent(src, nf) {
+    state.plan.meals.forEach(function (m) {
+      m.items.forEach(function (it, k) {
+        if (it.food.name !== src.name) return;
+        var grams = Math.round(it.exch / nf.exch100 * 100 / 5) * 5;
+        m.items[k] = { food: nf, exch: it.exch, grams: grams, rawGrams: grams, dry: P.isDry(nf), cat: nf.cat, swappedFrom: src.name };
+      });
+      m.nutri = P.sumItems(m.items);
+    });
+    state.day = P.sumMeals(state.plan.meals);
+  }
+
+  function selfTest() {
+    var box = $('selftest');
+    if (!box) return;
+    box.style.display = 'block';
+    var lines = [], fails = 0;
+    function ok(cond, msg, extra) {
+      if (!cond) fails++;
+      lines.push((cond ? '✓ ' : '✗ ') + msg + (extra !== undefined ? '　→ ' + extra : ''));
+    }
+    try {
+      loadDemo();
+      var rx = state.rx, day = state.day, plan = state.plan;
+      ok(!!rx && rx.energy > 800, '能量处方计算', rx && rx.energy + ' kcal');
+      ok(plan.meals.length >= 3, '配餐餐次数', plan.meals.length);
+      ok(plan.meals.every(function (m) { return m.items.length > 0 && m.items.every(function (it) { return it.grams > 0; }); }), '每餐均有食物与克数');
+      var dev = Math.abs(day.kcal - rx.energy) / rx.energy;
+      ok(dev <= 0.1, '全天能量偏差 ≤10%', n(dev * 100, 1) + '%');
+      ok(state.checks.length >= 14, '配餐要求自检条目数', state.checks.length);
+      ok($('planWrap').innerHTML.length > 2000, '配餐表格已渲染', $('planWrap').innerHTML.length + ' 字符');
+      ok($('dayNutri').innerHTML.indexOf('供能比') > 0, '营养对比已渲染');
+      ok($('checkTbl').innerHTML.indexOf('关键项目') > 0, '配餐要求自检已渲染');
+      ok($('foodTbl').innerHTML.indexOf('<tbody>') > 0, '食物库表格已渲染', P.DB.length + ' 条');
+      ok($('swapCandidates').innerHTML.length > 100, '平替候选已渲染');
+      var src = P.F('米饭（蒸，代表值）');
+      var cands = P.swapCandidates(src, 'carb', { sameCat: true, lowGI: true });
+      ok(cands.length > 0, '平替候选生成', cands.length + ' 项');
+      var before = plan.meals.map(function (m) { return m.items.map(function (it) { return it.food.name; }).join(); }).join('|');
+      applySwapToPlanSilent(src, cands[0].food);
+      var after = state.plan.meals.map(function (m) { return m.items.map(function (it) { return it.food.name; }).join(); }).join('|');
+      ok(before.indexOf(src.name) < 0 || before !== after, '食谱内替换生效', cands[0].food.name);
+      ok(!!state.glucose && !!state.glucose.result.level, '血糖判读', state.glucose && state.glucose.result.level.label);
+      var g = G.assess({ now: new Date(), bg: 3.2, trend: 'down2', phase: 'premeal', next: 'meal', profile: state.profile }, state.rules);
+      ok(g.level.key === 'hypo' || g.level.key === 'severe_hypo', '低血糖识别', g.level.key);
+      ok(g.actions.length > 0 && g.exercise.allowed === false, '低血糖处理动作与运动限制');
+      var g2 = G.assess({ now: new Date(), bg: 14.5, trend: 'up2', phase: 'premeal', next: 'meal', ketone: 'pos', profile: state.profile }, state.rules);
+      ok(g2.meal.carbFactor < 0.8 && g2.exercise.allowed === false, '高血糖减量与禁止运动', g2.meal.carbFactor);
+      ok($('gOut').innerHTML.length > 500, '即时建议已渲染');
+      ok($('timeline').innerHTML.indexOf('tl-row') > 0, '时间轴已渲染');
+      ok($('adjustedPlan').innerHTML.indexOf('调整') > 0, '调整后配餐已渲染');
+      ok(!!state.cgm && state.cgm.res.n > 10, 'CGM 统计', state.cgm && state.cgm.res.n + ' 条读数');
+      ok($('cgmOut').innerHTML.indexOf('TIR') > 0, 'CGM 报告已渲染');
+      var id = 'SELFTEST'; state.patientId = id; saveToLocalSilent();
+      var all = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+      ok(!!all[id], '本机存档写入');
+      loadFrom(all[id], true);
+      ok(!!(state.rx && state.plan), '存档读取成功');
+      document.querySelectorAll('.tab').forEach(function (t) { t.click(); });
+      ok(document.querySelectorAll('.tabpane.active').length === 1, '选项卡切换正常');
+    } catch (e) {
+      fails++;
+      lines.push('✗ 运行异常：' + e.message + '\n' + (e.stack || ''));
+    }
+    if (window.__errs && window.__errs.length) { fails++; lines.push('✗ 捕获到脚本错误：' + window.__errs.join(' / ')); }
+    box.innerHTML = '<h2>自检结果 ' + (fails ? badge(fails + ' 项未通过', 'danger') : badge('全部通过', 'ok')) + '</h2>' +
+      '<pre style="white-space:pre-wrap;font-size:12.5px;margin:0">' + esc(lines.join('\n')) + '</pre>';
+    document.title = (fails ? 'FAIL:' + fails : 'SELFTEST-OK') + ' — 糖尿病配餐工作台';
+    return { fails: fails, lines: lines };
+  }
+
+  /* -------------------------------------------------------- 规则设置 */
+  function renderRuleTable() {
+    var labels = {
+      hypoSerious: '严重低血糖阈值（mmol/L）', hypoLow: '低血糖阈值（mmol/L）',
+      preMealIdealLow: '空腹/餐前目标下限', preMealIdealHigh: '空腹/餐前目标上限',
+      targetLow: 'CGM 目标范围下限', targetHigh: 'CGM 目标范围上限 / 餐后目标',
+      veryHigh: '高血糖强化干预阈值', dkaWarn: '警惕 DKA/HHS 阈值',
+      sleepTargetLow: '睡前目标下限（防夜间低血糖）', exerciseMinBG: '运动前最低血糖',
+      exerciseMaxBG: '运动前最高血糖', preCarbG: '运动前加餐碳水（g）',
+      hypoCarbG: '低血糖处理碳水（g）', postMealExerciseMin: '餐后开始运动时间（分钟）'
+    };
+    $('ruleTbl').innerHTML = '<thead><tr><th>规则</th><th class="num" style="width:120px">取值</th></tr></thead><tbody>' +
+      Object.keys(state.rules).filter(function (k) { return labels[k]; }).map(function (k) {
+        return '<tr><td>' + esc(labels[k]) + '<div class="hint">' + esc(k) + '</div></td>' +
+          '<td class="num"><input type="number" step="0.1" data-rule="' + k + '" value="' + state.rules[k] + '"></td></tr>';
+      }).join('') + '</tbody>';
+    $('ruleTbl').querySelectorAll('input[data-rule]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        state.rules[inp.getAttribute('data-rule')] = +inp.value;
+        localStorage.setItem(LS_RULES, JSON.stringify(state.rules));
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------- 绑定 */
+  function bind() {
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.addEventListener('click', function () {
+        document.querySelectorAll('.tab').forEach(function (x) { x.classList.remove('active'); });
+        document.querySelectorAll('.tabpane').forEach(function (x) { x.classList.remove('active'); });
+        t.classList.add('active');
+        $(t.getAttribute('data-tab')).classList.add('active');
+        if (t.getAttribute('data-tab') === 'tab-data') { renderFoodStat(); renderStoreList(); }
+      });
+    });
+
+    ['pName', 'pSex', 'pAge', 'pHeight', 'pWeight', 'pActivity', 'pType', 'pTreat', 'pGest', 'pCkd', 'pGoal']
+      .forEach(function (id) { $(id).addEventListener('change', function () { renderProfile(); generatePlan(true); }); });
+    ['pComorbHtn', 'pComorbLip', 'pComorbGout', 'pComorbGp'].forEach(function (id) {
+      $(id).addEventListener('change', function () { renderProfile(); generatePlan(true); });
+    });
+    $('btnApplyMacro').addEventListener('click', function () {
+      state.manual = {
+        energy: +$('mEnergy').value, choPct: +$('mChoPct').value,
+        proPerKg: +$('mProPerKg').value, fatPct: +$('mFatPct').value, fiber: +$('mFiber').value
+      };
+      renderProfile();
+      generatePlan();
+    });
+    $('mealPreset').addEventListener('change', function () { renderMealPctBox(); generatePlan(); });
+    $('flavorPref').addEventListener('change', function () { generatePlan(); });
+    $('carbStrategy').addEventListener('change', function () { generatePlan(); });
+    $('btnGenPlan').addEventListener('click', function () { generatePlan(); });
+    $('mealPctBox').addEventListener('change', function (e) {
+      if (e.target.getAttribute && e.target.getAttribute('data-meal')) {
+        $('mealPreset').value = 'custom';
+        state.opts.mealPct = readMealPct();
+        generatePlan();
+      }
+    });
+
+    $('swapFrom').addEventListener('change', renderSwapCandidates);
+    $('swapMode').addEventListener('change', renderSwapCandidates);
+    $('swapLowGI').addEventListener('change', renderSwapCandidates);
+    $('swapSameCat').addEventListener('change', renderSwapCandidates);
+
+    $('foodSearch').addEventListener('input', renderFoodTable);
+    $('foodCatFilter').addEventListener('change', renderFoodTable);
+    $('foodSort').addEventListener('change', renderFoodTable);
+
+    $('btnGlucose').addEventListener('click', runGlucose);
+    $('btnGlucoseDemo').addEventListener('click', function () {
+      var d = new Date();
+      $('gTime').value = d.toISOString().slice(0, 16);
+      $('gValue').value = 12.4; $('gTrend').value = 'up2'; $('gPhase').value = 'premeal';
+      $('gSinceMeal').value = 240; $('gNext').value = 'meal'; $('gExIntensity').value = 'mod'; $('gExMin').value = 30;
+      $('gKetone').value = 'neg';
+      runGlucose();
+    });
+    $('btnCgm').addEventListener('click', function () {
+      var txt = $('cgmText').value;
+      var parsed = G.parseReadings(txt);
+      if (parsed.skipped) console.log('跳过行数：' + parsed.skipped);
+      runCGM(parsed.readings);
+    });
+    $('btnCgmDemo').addEventListener('click', function () {
+      var demo = demoCGM();
+      $('cgmText').value = demo.map(function (r) { return r.t + ', ' + r.v; }).join('\n');
+      runCGM(demo.map(function (r) { return { t: r.t, v: r.v }; }));
+    });
+    $('cgmFile').addEventListener('change', function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () {
+        $('cgmText').value = String(fr.result).slice(0, 200000);
+        runCGM(G.parseReadings(String(fr.result)).readings);
+      };
+      fr.readAsText(f, 'utf-8');
+    });
+
+    $('btnSave').addEventListener('click', saveToLocal);
+    $('btnLoad').addEventListener('click', function () {
+      var all = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+      var id = state.patientId;
+      if (id && all[id]) return loadFrom(all[id]);
+      document.querySelector('.tab[data-tab="tab-data"]').click();
+      alert('请在「⑤ 数据与设置」中选择要读取的存档。');
+    });
+    $('btnDemo').addEventListener('click', loadDemo);
+    $('btnPrint').addEventListener('click', function () { window.print(); });
+    $('btnExport').addEventListener('click', function () {
+      var txt = JSON.stringify(exportData(), null, 1);
+      $('dataJson').value = txt;
+      document.querySelector('.tab[data-tab="tab-data"]').click();
+      try {
+        var blob = new Blob([txt], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = (state.patientId || '糖尿病配餐方案') + '.json';
+        a.click();
+      } catch (e) { }
+    });
+    $('btnImport').addEventListener('click', function () {
+      try {
+        var data = JSON.parse($('dataJson').value);
+        loadFrom(data);
+      } catch (e) { alert('JSON 解析失败：' + e.message); }
+    });
+    $('btnStoreRefresh').addEventListener('click', renderStoreList);
+
+    $('btnFoodExport').addEventListener('click', function () {
+      var txt = JSON.stringify(P.DB, null, 1);
+      var blob = new Blob([txt], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '食物库.json';
+      a.click();
+    });
+    $('foodImport').addEventListener('change', function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () {
+        try {
+          var list = JSON.parse(String(fr.result));
+          if (!Array.isArray(list)) throw new Error('应为数组');
+          if (P.reloadDB(list)) {
+            localStorage.setItem(LS_DB, JSON.stringify(list));
+            renderSwapFromOptions(); renderFoodTable(); renderFoodStat(); generatePlan(true);
+            alert('食物库已更新：' + P.DB.length + ' 条。');
+          } else alert('没有可用条目。');
+        } catch (err) { alert('导入失败：' + err.message); }
+      };
+      fr.readAsText(f, 'utf-8');
+    });
+    $('btnFoodReset').addEventListener('click', function () {
+      localStorage.removeItem(LS_DB);
+      location.reload();
+    });
+  }
+
+  function demoCGM() {
+    var out = [], base = new Date();
+    base.setHours(0, 0, 0, 0);
+    for (var i = 0; i < 96; i++) {
+      var t = new Date(base.getTime() + i * 15 * 60000);
+      var h = t.getHours() + t.getMinutes() / 60;
+      var v = 6.4 + Math.sin((h - 6) / 24 * Math.PI * 2) * 2.0;
+      if (h > 7.5 && h < 9.5) v += 1.6;          // 早餐后
+      if (h > 12.5 && h < 14.5) v += 2.2;        // 午餐后
+      if (h > 18.5 && h < 20.5) v += 1.4;        // 晚餐后
+      if (h > 15.5 && h < 16.5) v -= 0.9;        // 运动后
+      if (i === 22) v = 3.6;                     // 一次低血糖
+      out.push({ t: ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2), v: Math.round(v * 10) / 10 });
+    }
+    return out;
+  }
+
+  function loadDemo() {
+    state.profile = {
+      name: '示例患者（陈某）', sex: 'male', age: 56, height: 172, weight: 78, activity: 'light',
+      type: 't2', treat: 'oral_high', gest: 'no', ckd: 'normal', goal: 'maintain',
+      comorb: { htn: true, lipid: true, gout: false, gp: false }
+    };
+    state.patientId = 'DEMO-001';
+    state.manual = {};
+    fillProfileForm(); renderProfile(); generatePlan();
+    var d = new Date();
+    $('gTime').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    $('gValue').value = 11.6; $('gTrend').value = 'up1'; $('gPhase').value = 'premeal'; $('gSinceMeal').value = 300;
+    $('gNext').value = 'meal'; $('gKetone').value = 'neg';
+    runGlucose();
+    $('btnCgmDemo').click();
+    document.querySelector('.tab[data-tab="tab-plan"]').click();
+  }
+
+  /* ------------------------------------------------------------- 启动 */
+  function init() {
+    // 自定义食物库 / 规则
+    try {
+      var custom = JSON.parse(localStorage.getItem(LS_DB) || 'null');
+      if (custom && custom.length) P.reloadDB(custom);
+      var rules = JSON.parse(localStorage.getItem(LS_RULES) || 'null');
+      if (rules) state.rules = Object.assign({}, G.DEFAULT_RULES, rules);
+    } catch (e) { }
+    $('verTag').textContent = '数据版本：' + (window.DATA_VERSION || '—') + '｜引擎：配餐 ' + P.DB.length + ' 条食物';
+    $('foodCatFilter').innerHTML = '<option value="">全部分类</option>' + Object.keys(P.CAT_META).map(function (c) {
+      return '<option value="' + c + '">' + esc(catLabel(c)) + '</option>';
+    }).join('');
+    fillProfileForm();
+    renderMealPctBox();
+    renderProfile();
+    generatePlan();
+    renderSwapFromOptions();
+    renderSwapCandidates();
+    renderFoodTable();
+    renderFoodStat();
+    renderStoreList();
+    renderRuleTable();
+    $('timeline').innerHTML = '<p class="hint">生成配餐模板并录入血糖后，会显示当日的进餐、加餐、运动与监测时间轴。</p>';
+    bind();
+    // 地址栏参数：#demo 载入示例、#tab-plan 等定位选项卡、#selftest 运行界面自检（可用逗号组合）
+    var parts = (location.hash || '').replace('#', '').split(',');
+    if (parts.indexOf('demo') >= 0) loadDemo();
+    parts.forEach(function (h) {
+      if (h.indexOf('tab-') === 0 && document.getElementById(h)) {
+        var tb = document.querySelector('.tab[data-tab="' + h + '"]');
+        if (tb) tb.click();
+      }
+    });
+    if (parts.indexOf('selftest') >= 0) setTimeout(selfTest, 60);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
+</script>
+</body>
+</html>
