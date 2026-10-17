@@ -103,6 +103,15 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
+    files = collect_files()
+    total = sum(f[2] for f in files)
+    log("待发布文件 %d 个，共 %.1f KB" % (len(files), total / 1024.0))
+    for rel, _, size in files:
+        log("  %8.1f KB  %s" % (size / 1024.0, rel))
+    if args.dry_run:
+        log("\n--dry-run：仅检查文件清单，不写入 GitHub（不需要 token）。")
+        return 0
+
     if not args.token:
         log("缺少 token：请设置环境变量 GITHUB_TOKEN，或用 --token 传入。")
         log("生成地址：https://github.com/settings/tokens")
@@ -114,15 +123,6 @@ def main():
         return 2
     owner = args.owner or me["login"]
     log("已认证：%s" % owner)
-
-    files = collect_files()
-    total = sum(f[2] for f in files)
-    log("待发布文件 %d 个，共 %.1f KB" % (len(files), total / 1024.0))
-    for rel, _, size in files:
-        log("  %8.1f KB  %s" % (size / 1024.0, rel))
-    if args.dry_run:
-        log("\n--dry-run：仅检查，不写入 GitHub。")
-        return 0
 
     # 1) 建仓（若已存在则沿用）
     status, repo = api("POST", "/user/repos", args.token, {
