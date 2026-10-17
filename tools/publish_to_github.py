@@ -30,7 +30,7 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 API = "https://api.github.com"
-SKIP_DIRS = {".git", "refs", "node_modules", "__pycache__", ".vscode", ".idea"}
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".vscode", ".idea"}
 SKIP_EXT = {".pyc", ".log", ".tmp"}
 MAX_BYTES = 20 * 1024 * 1024
 
