@@ -5,12 +5,20 @@
 
 全部在本机运行，**不联网、不上传数据**，数据只保存在浏览器 localStorage 里。
 
+## 在线使用
+
+- **GitHub Pages**：<https://gusihangluta.github.io/diabetes-nutrition-workbench/>
+- **离线下载**：<https://github.com/GUSIHANGLUTA/diabetes-nutrition-workbench/releases/tag/v1.0.0>
+
+在线版与离线单文件版功能一致；在线版首次加载后也可以断网使用。
+
 ---
 
 ## 一、交付物
 
 | 文件 | 说明 |
 | --- | --- |
+| `index.html` | **GitHub Pages 在线入口**，内容与单文件版一致 |
 | `糖尿病配餐与血糖管理.html` | **单文件版（推荐）**，双击即可用，可发微信/邮件给同事，无需安装任何环境 |
 | `app/index.html` | 多文件开发版（含 `styles.css`、`data-foods.js`、`engine-prescription.js`、`engine-glucose.js`、`app.js`） |
 | `tools/build_single.py` | 把 `app/` 打包成单文件版 |
