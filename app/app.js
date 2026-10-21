@@ -116,9 +116,9 @@
       ['理想体重', n(rx.ibw, 1) + ' kg', 'Broca 改良公式：身高(cm) − 105'],
       ['BMI', n(rx.bmi, 1) + ' kg/m²', '中国标准：<18.5 消瘦 / 18.5～23.9 正常 / 24～27.9 超重 / ≥28 肥胖'],
       ['每日能量', n(rx.energy) + ' kcal', rx.coef + ' kcal/kg 理想体重 × ' + rx.bodyTypeLabel],
-      ['碳水化合物', n(rx.choG) + ' g', rx.choPct + '%E（指南 45%～60%）'],
+      ['碳水化合物', n(rx.choG) + ' g', n(rx.choPct, 1) + '%E（指南 45%～60%）'],
       ['蛋白质', n(rx.proG) + ' g', rx.proKg !== undefined ? '' : rx.proPerKg + ' g/kg（可接受 ' + rx.proRangeG[0] + '～' + rx.proRangeG[1] + ' g）'],
-      ['脂肪', n(rx.fatG) + ' g', rx.fatPct + '%E（建议 20%～30%）'],
+      ['脂肪', n(rx.fatG) + ' g', n(rx.fatPct, 1) + '%E（建议 20%～30%）'],
       ['膳食纤维', n(rx.fiberG) + ' g', '按 14 g/1000 kcal 折算'],
       ['交换份总量', n(rx.exchTotal, 1) + ' 份', '1 交换份 = 90 kcal']
     ].map(function (row) {
@@ -126,16 +126,16 @@
     }).join('');
 
     if (document.activeElement !== $('mEnergy')) $('mEnergy').value = rx.energy;
-    if (document.activeElement !== $('mChoPct')) $('mChoPct').value = rx.choPct;
+    if (document.activeElement !== $('mChoPct')) $('mChoPct').value = n(rx.choPct, 1);
     if (document.activeElement !== $('mProPerKg')) $('mProPerKg').value = rx.proPerKg;
     if (document.activeElement !== $('mFatPct')) $('mFatPct').value = rx.fatPct;
     if (document.activeElement !== $('mFiber')) $('mFiber').value = rx.fiberG;
 
     $('macroTbl').innerHTML = '<thead><tr><th>营养素</th><th class="num">目标量</th><th class="num">供能比</th><th>说明</th></tr></thead><tbody>' +
       [['能量', n(rx.energy) + ' kcal', '—', '按理想体重 × 活动系数'],
-       ['碳水化合物', n(rx.choG) + ' g', rx.choPct + '%', '优选低 GI、全谷杂豆 ≥1/3'],
+       ['碳水化合物', n(rx.choG) + ' g', n(rx.choPct, 1) + '%', '优选低 GI、全谷杂豆 ≥1/3'],
        ['蛋白质', n(rx.proG) + ' g', rx.proPct + '%', '优质蛋白 ≥50%，分散到各餐'],
-       ['脂肪', n(rx.fatG) + ' g', rx.fatPct + '%', '饱和脂肪 <7%E，烹调油 25～30 g'],
+       ['脂肪', n(rx.fatG) + ' g', n(rx.fatPct, 1) + '%', '饱和脂肪 <7%E，烹调油 25～30 g'],
        ['膳食纤维', n(rx.fiberG) + ' g', '—', '全谷、蔬菜、豆类、坚果']
       ].map(function (r) { return '<tr><td>' + r[0] + '</td><td class="num">' + r[1] + '</td><td class="num">' + r[2] + '</td><td class="hint">' + r[3] + '</td></tr>'; }).join('') +
       '</tbody>';
