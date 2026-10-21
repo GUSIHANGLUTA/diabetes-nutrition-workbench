@@ -8,7 +8,7 @@
 ## 在线使用
 
 - **GitHub Pages**：<https://gusihangluta.github.io/diabetes-nutrition-workbench/>
-- **离线下载**：<https://github.com/GUSIHANGLUTA/diabetes-nutrition-workbench/releases/tag/v1.0.0>
+- **离线下载**：<https://github.com/GUSIHANGLUTA/diabetes-nutrition-workbench/releases/latest>
 
 在线版与离线单文件版功能一致；在线版首次加载后也可以断网使用。
 
